@@ -1,0 +1,15 @@
+name: Launch MSSQL on GitHub Linux VMs
+
+runs:
+  using: composite
+  steps:
+    - name: Cache connection details
+      shell: bash -el {0}
+      run: echo '{"project_name":"","port":1434,"docker_compose_file":"","cache_file":""}' > ./tests/mssql_container/.mssql_container_cache.json
+    - name: Login to GHCR
+      shell: bash -el {0}
+      run: docker login ghcr.io -u ${{ github.actor }} -p ${{ github.token }}
+    - name: Launch MSSQL
+      shell: bash -el {0}
+      run: |
+        docker compose -f ./tests/mssql_container/docker-compose.yml up -d

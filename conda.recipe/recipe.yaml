@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  name: tabulardelta
+  version: ${{ env.get('GIT_DESCRIBE_TAG') | trim('v') }}${{ ('.post' + env.get('GIT_DESCRIBE_NUMBER') + '+' + env.get('GIT_DESCRIBE_HASH')) if env.get('GIT_DESCRIBE_NUMBER', default='0') != '0' }}
+
+package:
+  name: ${{ name | lower }}
+  version: ${{ version }}
+
+source:
+  path: ../
+
+build:
+  number: 0
+  noarch: python
+  script:
+    - python -m pip install . --no-deps --ignore-installed -vv --no-build-isolation --disable-pip-version-check
+
+requirements:
+  host:
+    - python >=3.11
+    - pip
+    - setuptools-scm
+  run:
+    - python >=3.11
+    - numpy >=1.24.4,<3
+    - pandas >=2.0.3,<3
+  run_constraints:
+    - sqlalchemy
+    - sqlcompyre
+    - pyodbc
+
+tests:
+  - python:
+      imports:
+        - tabulardelta
+      pip_check: true
+
+about:
+  homepage: https://github.com/quantco/tabulardelta
+  license: LicenseRef-QuantCo
+  summary: "Simplify arbitrary table comparisons."

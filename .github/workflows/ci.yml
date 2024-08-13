@@ -1,0 +1,58 @@
+name: CI
+on: [push]
+
+# Automatically stop old builds on the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@ba3bb36eb2066252b2363392b7739741bb777659
+        with:
+          environments: default lint
+      - name: pre-commit
+        run: pixi run pre-commit-run --color=always --show-diff-on-failure
+
+  unit-tests:
+    name: pytest
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - py311
+          - py312
+          - no-sql
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install msodbcsql17 (Linux Only)
+        if: ${{ matrix.environment != 'no-sql' && matrix.os == 'ubuntu-latest' }}
+        run: sudo ACCEPT_EULA=Y apt-get install msodbcsql17 -y
+      - name: Launch MSSQL (Linux Only)
+        if: ${{ matrix.environment != 'no-sql' && matrix.os == 'ubuntu-latest' }}
+        uses: ./.github/actions/mssql-linux
+      - name: Launch MSSQL (Windows Only)
+        if: ${{ matrix.environment != 'no-sql' && matrix.os == 'windows-latest' }}
+        uses: ./.github/actions/mssql-windows
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@ba3bb36eb2066252b2363392b7739741bb777659
+        with:
+          environments: ${{ matrix.environment }}
+      - name: Install repository
+        run: pixi run -e ${{ matrix.environment }} postinstall
+      - name: Run pytest
+        run: pixi run -e ${{ matrix.environment }} test-coverage --color=yes ${{ matrix.environment=='no-sql' && '-m "not sql"' || ''}}

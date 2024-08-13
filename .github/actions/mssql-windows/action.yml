@@ -1,0 +1,32 @@
+name: Launch MSSQL on GitHub Windows VMs
+
+runs:
+  using: composite
+  steps:
+    - name: Cache connection details
+      shell: bash -el {0}
+      run: echo '{"project_name":"","port":null,"docker_compose_file":"","cache_file":""}' > ./tests/mssql_container/.mssql_container_cache.json
+    - name: Start SQL Server LocalDB
+      shell: bash -el {0}
+      run: |
+        SqlLocalDB.exe create "SQLLocalDB"
+        SqlLocalDB.exe share "SQLLocalDB" "MSSQLLocalDB"
+        SqlLocalDB.exe start "SQLLocalDB"
+    - name: Establish login for SQL Server LocalDB
+      shell: bash -el {0}
+      run: |
+        CONN_STR=$(
+          SqlLocalDB.exe info "SQLLocalDB" \
+          | grep "Instance pipe name:" \
+          | sed 's/^Instance pipe name: \(.*\)$/\1/'
+        )
+        CREATE_USER_QUERY=$(
+          cat <<EOF
+          ALTER LOGIN sa ENABLE;
+          GO
+          ALTER LOGIN sa WITH PASSWORD = 'Passw0rd' UNLOCK;
+          GO
+          EXIT
+        EOF
+        )
+        sqlcmd -b -j -S "$CONN_STR" -Q "$CREATE_USER_QUERY"
