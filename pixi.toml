@@ -69,9 +69,8 @@ python = "3.12.*"
 
 [feature.sql.dependencies]
 sqlalchemy = "*"
-pyodbc = "*"
-[feature.sql.pypi-dependencies]
 sqlcompyre = "*"
+pyodbc = "*"
 
 [environments]
 no-sql = ["test"]
