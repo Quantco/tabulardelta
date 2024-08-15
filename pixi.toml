@@ -11,9 +11,6 @@ postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-
 python = ">=3.11"
 numpy = ">=1.24.4,<3"
 pandas = ">=2.0.3,<3"
-pydiverse-pipedag = ">=0.9.3,<0.10"
-duckdb = ">=1.0.0,<1.1"
-duckdb-engine = ">=0.12.1,<0.13"
 
 [host-dependencies]
 pip = "*"
@@ -34,6 +31,7 @@ pytest = ">=6"
 pytest-cov = "*"
 pytest-md = "*"
 pytest-emoji = "*"
+pydiverse-pipedag = ">=0.9.3,<0.10"
 mypy = "*"
 pandas-stubs = "*"
 pixi-pycharm = "*"
