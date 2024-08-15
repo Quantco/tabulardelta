@@ -11,6 +11,9 @@ To compare two tables, first select a comparator that supports the table format.
 
 ## Usage example
 
+This snippet will report the differences of two CSV files.
+You can execute it directly in [test_docs_examples.py](tests/test_docs_examples.py).
+
 ```python
 import pandas as pd
 from tabulardelta import PandasComparator, DetailedTextFormatter
