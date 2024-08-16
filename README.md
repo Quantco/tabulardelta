@@ -5,7 +5,32 @@
 [![pypi-version](https://img.shields.io/pypi/v/tabulardelta.svg?logo=pypi&logoColor=white&style=flat-square)](https://pypi.org/project/tabulardelta)
 [![python-version](https://img.shields.io/pypi/pyversions/tabulardelta?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/tabulardelta)
 
-Simplify table comparisons.
+TabularDelta helps to automate and simplify the often tedious and manual process of comparing relational data.
+
+The so-called TabularDelta protocol defines a representation of the differences between two tables.
+"Comparators" are used to generate such a representation from two table objects. The exchangeability of the comparators allows for varying table input formats like SQL tables or Pandas DataFrames.
+"Formatters" allow to present the differences in different output formats depending on the desired usecase.
+The flexibility in the output format allows to find small deviations in largely similar tables or provide an overview of more structural changes.
+
+## Usage example
+
+This snippet will report the differences of two CSV files.
+You can execute it directly in [test_docs_examples.py](tests/test_docs_examples.py).
+
+```python
+import pandas as pd
+from tabulardelta import PandasComparator, DetailedTextFormatter
+
+df_old = pd.read_csv("week24.csv", index_col=[0, 1])
+df_new = pd.read_csv("week25.csv", index_col=[0, 1])
+
+delta = PandasComparator().compare(df_old, df_new)
+print(DetailedTextFormatter().format(delta))
+```
+
+To compare two tables, first select a comparator that supports the table format. Now select any formatter that best suits your use case to obtain a visualization of the result.
+
+To find more examples and get started, please visit the [documentation](https://tabulardelta.readthedocs.io/en/latest/).
 
 ## Development
 
@@ -18,7 +43,6 @@ cd tabulardelta
 
 pixi run pre-commit-install
 pixi run postinstall
-pixi run test
 ```
 
 ## Testing
