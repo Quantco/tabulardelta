@@ -5,7 +5,11 @@
 [![pypi-version](https://img.shields.io/pypi/v/tabulardelta.svg?logo=pypi&logoColor=white&style=flat-square)](https://pypi.org/project/tabulardelta)
 [![python-version](https://img.shields.io/pypi/pyversions/tabulardelta?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/tabulardelta)
 
-TabularDelta simplifies the comparison of diverse tables, like SQL tables or Pandas DataFrames. It can both find small deviations in largely similar tables, as well as provide an overview of more structural changes.
+TabularDelta helps to automate and simplify the often tedious and manual process of comparing relational data.
+The TabularDelta protocol defines a representation of the differences between two tables.
+"Comparators" are used to generate such a representation from two table objects. The exchangeability of the comparators allows for varying table input formats like SQL tables or Pandas DataFrames.
+"Formatters" allow to present the differences in different output formats depending on the desired usecase.
+The flexibility in the output format allows to find small deviations in largely similar tables or provide an overview of more structural changes.
 
 To compare two tables, first select a comparator that supports the table format. Now select any formatter that best suits your use case to obtain a visualization of the result.
 
