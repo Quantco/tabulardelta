@@ -6,12 +6,11 @@
 [![python-version](https://img.shields.io/pypi/pyversions/tabulardelta?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/tabulardelta)
 
 TabularDelta helps to automate and simplify the often tedious and manual process of comparing relational data.
-The TabularDelta protocol defines a representation of the differences between two tables.
+
+The so-called TabularDelta protocol defines a representation of the differences between two tables.
 "Comparators" are used to generate such a representation from two table objects. The exchangeability of the comparators allows for varying table input formats like SQL tables or Pandas DataFrames.
 "Formatters" allow to present the differences in different output formats depending on the desired usecase.
 The flexibility in the output format allows to find small deviations in largely similar tables or provide an overview of more structural changes.
-
-To compare two tables, first select a comparator that supports the table format. Now select any formatter that best suits your use case to obtain a visualization of the result.
 
 ## Usage example
 
@@ -28,6 +27,8 @@ df_new = pd.read_csv("week25.csv", index_col=[0, 1])
 delta = PandasComparator().compare(df_old, df_new)
 print(DetailedTextFormatter().format(delta))
 ```
+
+To compare two tables, first select a comparator that supports the table format. Now select any formatter that best suits your use case to obtain a visualization of the result.
 
 To find more examples and get started, please visit the [documentation](https://tabulardelta.readthedocs.io/en/latest/).
 
