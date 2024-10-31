@@ -290,7 +290,9 @@ def compare_pandas(
                 left, right, float_rtol, float_atol, True
             )
         else:
-            joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(left) & pd.isna(right)
+            joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(
+                left
+            ) & pd.isna(right)
         unequal = joined[~joined[col + "_equal"].astype("bool")]
         change = _value_change(unequal, join_columns, col, suffixes, old_dt, new_dt)
         if len(change) > 0:
