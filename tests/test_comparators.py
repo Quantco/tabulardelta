@@ -1,7 +1,7 @@
 # Copyright (c) QuantCo 2022-2024
 # SPDX-License-Identifier: LicenseRef-QuantCo
 from typing import Any, NamedTuple
-
+import polars as pl
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,6 +13,7 @@ from tabulardelta import (
     SqlCompyreComparator,
     SqlMetadataComparator,
 )
+from tabulardelta.comparators.polars_comparator import PolarsComparator
 from tabulardelta.comparators.tabulardelta_dataclasses import (
     Column,
     ColumnPair,
@@ -486,3 +487,58 @@ def test_sqlmetadata_comparator_cache(mssql_engine: sa.Engine):
     # Cached comparison should be equal to original
     cached_delta = cache_comp.compare("first", "second")
     assert cached_delta == original_delta
+
+def old_pl_df():
+    """
+    Polars equivalent of old_df()
+    """
+    return pl.DataFrame(
+        {
+            "id": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            "equal": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "paid": [
+                "yes",
+                "no",
+                "yes",
+                "maybe",
+                "yes",
+                "no",
+                "yes",
+                "no",
+                "yes",
+                "no",
+            ],
+            "unnecessary": [0] * 10,
+            "name": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+            "measurement": [[val] * 3 for val in np.arange(0.1, 1.1, 0.1)],
+            "expectation": [0.12, 0.24, 0.36, 0.48, 0.5, 0.68, 0.76, 0.84, 0.92, 1.0],
+        }
+    )
+
+def new_pl_df():
+    """
+    Polars equivalent of new_df()
+    """
+    df = old_pl_df().with_columns(
+        paid=pl.when(pl.col("paid") == "yes").then(True).otherwise(False),
+        renamedmeasurement=pl.col("measurement"),
+        results=pl.col("measurement").list.sum() / pl.col("measurement").list.len(),
+        expectation=pl.col("expectation").cast(pl.Float32),
+        id=pl.col("id").cast(pl.Float64),
+        second_result=(pl.col("measurement").list.sum() / pl.col("measurement").list.len()).cast(pl.Float32),
+    ).drop(["unnecessary", "measurement"])
+
+    row_0 = df[0]
+    row_1 = df[1]
+    df = pl.concat([row_1, row_0, df[2:]])
+    df[9, "name"] = "Jess"
+    df[4, "expectation"] = 0.55
+
+    df = pl.concat([
+        df,
+        pl.DataFrame({"id": 10.0, "equal": 0, "paid": True, "name": "Karl", "expectation": 0.9, "renamedmeasurement": [[1.0, 1.1, 1.2]], "results": 1.1, "second_result": 1.1}).cast({"equal": pl.Int64, "expectation": pl.Float32, "second_result": pl.Float32})
+    ])
+    return df
+
+def test_polars_comparator():
+    delta = PolarsComparator(["id"]).compare(old_pl_df(), new_pl_df())
