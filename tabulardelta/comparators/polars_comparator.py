@@ -77,15 +77,25 @@ def _join(
         raise Exception("Datatypes of join columns changed. Cannot join dataframes for comparison."
                         f" Old dtypes {old.select(join_cols).dtypes}, "
                         f"New dtypes {old.select(join_cols).dtypes}")
-    cols_left = [f"{col}_left" for col in old.columns if col not in join_cols]
-    cols_right = [f"{col}_right"  for col in new.columns if col not in join_cols]
-    outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
+    cols_old_rename = {col: f"{col}{suffixes[0]}" for col in old.columns}
+    cols_new_rename = {col: f"{col}{suffixes[1]}" for col in new.columns}
+    old = old.rename(cols_old_rename)
+    new = new.rename(cols_new_rename)
+    outer = old.join(new, left_on=[f"{col}_old" for col in join_cols], right_on=[f"{col}_new" for col in join_cols], how="outer", suffix=suffixes[1])
+
+    row_in_old = pl.lit(True)
+    for col in join_cols:
+        row_in_old &= pl.col(f"{col}{suffixes[0]}").is_not_null()
+    row_in_new = pl.lit(True)
+    for col in join_cols:
+        row_in_new &= pl.col(f"{col}{suffixes[1]}").is_not_null()
+
     # Added rows are in new but not in old
-    added_rows = old.filter(pl.all(pl.col(f"{col}_new").is_not_null() for col in join_cols))
+    added_rows = outer.filter(~row_in_old & row_in_new)
     # Removed rows are in old but not in new
-    removed_rows = old.filter(pl.all(pl.col(f"{col}_old").is_not_null() for col in join_cols))
+    removed_rows = outer.filter(row_in_old & ~row_in_new)
     # Joined rows are in both
-    joined = old.filter(pl.all(pl.col(f"{col}_old").is_not_null() for col in join_cols))
+    joined = outer.filter(row_in_old & row_in_new)
     return added_rows, removed_rows, joined
 
 def compare_polars(
@@ -144,10 +154,10 @@ def compare_polars(
         common = [col for col in old.columns if col in new.columns]
         join_columns = [col for col in common if old_dtypes[col] == new_dtypes[col]]
         added_rows, removed_rows, joined = _join(old, new, join_columns, suffixes)
-    # if check_row_order:
-    #     joined = joined.sort_values("_old_row_number")
-    #     if not joined["_new_row_number"].is_monotonic_increasing:
-    #         info.append("Row Order Changed!")
-    #     joined.drop(columns=["_old_row_number", "_new_row_number"], inplace=True)
-    #     added_rows.drop(columns=["_new_row_number"], inplace=True)
-    #     removed_rows.drop(columns=["_old_row_number"], inplace=True)
+    if check_row_order:
+        joined = joined.sort("_old_row_number")
+        if not joined["_new_row_number"].is_monotonic_increasing:
+            info.append("Row Order Changed!")
+        joined.drop(columns=["_old_row_number", "_new_row_number"], inplace=True)
+        added_rows.drop(columns=["_new_row_number"], inplace=True)
+        removed_rows.drop(columns=["_old_row_number"], inplace=True)
