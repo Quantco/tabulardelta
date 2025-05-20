@@ -155,9 +155,32 @@ def compare_polars(
         join_columns = [col for col in common if old_dtypes[col] == new_dtypes[col]]
         added_rows, removed_rows, joined = _join(old, new, join_columns, suffixes)
     if check_row_order:
-        joined = joined.sort("_old_row_number")
-        if not joined["_new_row_number"].is_monotonic_increasing:
+        joined = joined.sort(f"_old_row_number{suffixes[0]}")
+        if not _is_increasing(joined[f"_new_row_number{suffixes[1]}"]):
             info.append("Row Order Changed!")
-        joined.drop(columns=["_old_row_number", "_new_row_number"], inplace=True)
-        added_rows.drop(columns=["_new_row_number"], inplace=True)
-        removed_rows.drop(columns=["_old_row_number"], inplace=True)
+        joined = joined.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
+        added_rows = added_rows.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
+        removed_rows = removed_rows.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
+
+    # 2. Match columns (rename equal columns, drop unmatched)
+    only_old = set(old.columns) & set(joined.columns) - set(join_columns)
+    only_new = set(new.columns) & set(joined.columns) - set(join_columns)
+    tmp = {n: o for o in only_old for n in only_new if joined[o].equals(joined[n])}
+    renamed = {v: k for k, v in tmp.items()}  # Make both sides unique by reversing
+    if joined.shape[0] == 0:
+        renamed = {}  # Without rows, every column is equal
+    mapping = {v + suffixes[1]: v for v in renamed.values()}
+    mapping |= {v + suffixes[0]: k for k, v in renamed.items()}
+    unmatched_cols = (only_old | only_new) - set(renamed.keys()) - set(renamed.values())
+    joined.rename(columns={v: k for k, v in mapping.items()}, inplace=True)
+    joined.drop(columns=list(unmatched_cols), inplace=True)
+
+def _is_increasing(x: pl.Expr, strict: bool = False) -> pl.Expr:
+    """
+    Checks whether the column is monotonically increasing.
+    strict: Whether the check should be strict
+    """
+    if strict:
+        return (x.diff() > 0.0).all()
+    else:
+        return (x.diff() >= 0.0).all()
