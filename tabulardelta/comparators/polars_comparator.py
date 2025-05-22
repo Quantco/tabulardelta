@@ -15,6 +15,21 @@ from tabulardelta.comparators.tabulardelta_dataclasses import (
     TabularDelta,
 )
 
+# TODO
+LOSSLESS_CONV = {
+    "int8": {"int16", "int32", "int64", "object"},
+    "int16": {"int32", "int64", "object"},
+    "int32": {"int64", "object"},
+    "int64": {"object"},
+    "uint8": {"uint16", "uint32", "uint64", "object"},
+    "uint16": {"uint32", "uint64", "object"},
+    "uint32": {"uint64", "object"},
+    "uint64": {"object"},
+    "float32": {"float64", "object"},
+    "float64": {"object"},
+    # String dtypes are currently (2024-05-10) experimental and hard to compare.
+}
+
 @dataclass(frozen=True)
 class PolarsComparator:
     """Implements :class:`Comparator` protocol for comparing polars DataFrames.
@@ -77,11 +92,12 @@ def _join(
         raise Exception("Datatypes of join columns changed. Cannot join dataframes for comparison."
                         f" Old dtypes {old.select(join_cols).dtypes}, "
                         f"New dtypes {old.select(join_cols).dtypes}")
-    cols_old_rename = {col: f"{col}{suffixes[0]}" for col in old.columns}
-    cols_new_rename = {col: f"{col}{suffixes[1]}" for col in new.columns}
-    old = old.rename(cols_old_rename)
-    new = new.rename(cols_new_rename)
-    outer = old.join(new, left_on=[f"{col}_old" for col in join_cols], right_on=[f"{col}_new" for col in join_cols], how="outer", suffix=suffixes[1])
+
+    outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
+    in_old_and_new = set(old.columns) & set(new.columns)
+    outer = outer.rename({col: f"{col}{suffixes[0]}" for col in in_old_and_new})
+    if outer.select(*[f"{col}{suf}" for col in join_cols for suf in suffixes]).is_duplicated().any():
+        raise KeyError(f"Join columns {join_cols} are not unique.")
 
     row_in_old = pl.lit(True)
     for col in join_cols:
@@ -91,9 +107,13 @@ def _join(
         row_in_new &= pl.col(f"{col}{suffixes[1]}").is_not_null()
 
     # Added rows are in new but not in old
-    added_rows = outer.filter(~row_in_old & row_in_new)
+    added_rows = outer.filter(~row_in_old & row_in_new).select(*[f"{col}{suffixes[1]}" for col in join_cols]).rename({f"{col}{suffixes[1]}": col for col in join_cols})
+    added_rows = new.join(added_rows, on=join_cols, how="inner")
+
     # Removed rows are in old but not in new
-    removed_rows = outer.filter(row_in_old & ~row_in_new)
+    removed_rows = outer.filter(row_in_old & ~row_in_new).select(*[f"{col}{suffixes[0]}" for col in join_cols]).rename({f"{col}{suffixes[0]}": col for col in join_cols})
+    removed_rows = old.join(removed_rows, on=join_cols, how="inner")
+
     # Joined rows are in both
     joined = outer.filter(row_in_old & row_in_new)
     return added_rows, removed_rows, joined
@@ -155,12 +175,12 @@ def compare_polars(
         join_columns = [col for col in common if old_dtypes[col] == new_dtypes[col]]
         added_rows, removed_rows, joined = _join(old, new, join_columns, suffixes)
     if check_row_order:
-        joined = joined.sort(f"_old_row_number{suffixes[0]}")
-        if not _is_increasing(joined[f"_new_row_number{suffixes[1]}"]):
+        joined = joined.sort("_old_row_number")
+        if not _is_increasing(joined["_new_row_number"]):
             info.append("Row Order Changed!")
-        joined = joined.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
-        added_rows = added_rows.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
-        removed_rows = removed_rows.drop(f"_old_row_number{suffixes[0]}", f"_new_row_number{suffixes[1]}")
+        joined = joined.drop("_old_row_number", "_new_row_number")
+        added_rows = added_rows.drop("_new_row_number")
+        removed_rows = removed_rows.drop("_old_row_number")
 
     # 2. Match columns (rename equal columns, drop unmatched)
     only_old = set(old.columns) & set(joined.columns) - set(join_columns)
@@ -172,8 +192,93 @@ def compare_polars(
     mapping = {v + suffixes[1]: v for v in renamed.values()}
     mapping |= {v + suffixes[0]: k for k, v in renamed.items()}
     unmatched_cols = (only_old | only_new) - set(renamed.keys()) - set(renamed.values())
-    joined.rename(columns={v: k for k, v in mapping.items()}, inplace=True)
-    joined.drop(columns=list(unmatched_cols), inplace=True)
+    joined = joined.rename({v: k for k, v in mapping.items()})
+    joined.drop(list(unmatched_cols))
+
+    # 2.5 Check column order
+    old_cols_renamed = [renamed.get(c, c) for c in old.columns]
+    new_col_positions = [np.flatnonzero(new.columns == c) for c in old_cols_renamed]
+    if any(len(pos) > 1 for pos in new_col_positions):
+        errors = [f"No injective column mapping (renaming: {renamed})"]
+        return TabularDelta.from_errors(errors)
+    filtered_positions = [pos[0] for pos in new_col_positions if len(pos) == 1]
+    if not all(i < j for i, j in zip(filtered_positions, filtered_positions[1:])):
+        info.append("Column Order Changed!")
+
+    # Quick access to important datastructures:
+    cols = set(joined.columns)  # Get interesting (non-joined) columns without suffix
+    cols = {col[: -len(suffixes[0])] for col in cols if col.endswith(suffixes[0])}
+    old_names = {col: mapping.get(col + suffixes[0], col) for col in cols}
+    new_names = {col: mapping.get(col + suffixes[1], col) for col in cols}
+    old_dt = {col: old_dtypes[old_names[col]] for col in cols}  # Using new names
+    new_dt = {col: new_dtypes[new_names[col]] for col in cols}  # Using new names
+
+    # 3. Match dtypes (cast if possible, otherwise mark incomparable)
+    dtype_changes: list[ColumnPair] = []
+    changed = {col for col in cols if old_dt[col] != new_dt[col]}
+    cast_old = {c for c in changed if old_dt[c] in LOSSLESS_CONV.get(new_dt[c], set())}
+    cast_new = {c for c in changed if new_dt[c] in LOSSLESS_CONV.get(old_dt[c], set())}
+    unsupported = changed - cast_old - cast_new
+    for col in cast_old | cast_new:
+        _cast(
+            joined, col + suffixes[0], new_dt[col] if col in cast_new else old_dt[col]
+        )
+        _cast(
+            joined, col + suffixes[1], new_dt[col] if col in cast_new else old_dt[col]
+        )
+    for col in unsupported:
+        change = _value_change(
+            joined, join_columns, col, suffixes, old_dt, new_dt, True
+        )
+        dtype_changes.append(change)
+        joined.drop(columns=[col + suffixes[0], col + suffixes[1]], inplace=True)
+    cols -= unsupported
+
+    # 4. Compare values
+    column_changes = []
+    for col in cols:
+        left, right = joined[col + suffixes[0]], joined[col + suffixes[1]]
+        if joined.dtypes[col + suffixes[0]] in ["float32", "float64"]:
+            joined[col + "_equal"] = np.isclose(
+                left, right, float_rtol, float_atol, True
+            )
+        else:
+            joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(
+                left
+            ) & pd.isna(right)
+        unequal = joined[~joined[col + "_equal"].astype("bool")]
+        change = _value_change(unequal, join_columns, col, suffixes, old_dt, new_dt)
+        if len(change) > 0:
+            column_changes.append(change)
+    joined["_equal"] = joined[[col + "_equal" for col in cols]].agg("all", axis=1)
+    equal_rows = joined[["_equal"]].value_counts().get(True, 0)
+
+    # 5. Return DataFrameDiff
+    ren_cols = [
+        ColumnPair.from_str(old, old_dtypes[old], new, new_dtypes[new])
+        for old, new in renamed.items()
+    ]
+    added = [
+        (None, None, col, new_dtypes[col]) for col in only_new - set(renamed.values())
+    ]
+    removed = [(col, old_dtypes[col]) for col in only_old - set(renamed.keys())]
+    joins = [(c, old_dtypes[c], c, new_dtypes[c], True) for c in join_columns]
+    uncompared = [ColumnPair.from_str(*pair) for pair in added + removed + joins]
+    return TabularDelta(
+        name,
+        info=info,
+        warnings=warnings,
+        _columns=column_changes + dtype_changes + ren_cols + uncompared,
+        _old_rows=old.shape[0],
+        _new_rows=new.shape[0],
+        _added_rows=new.shape[0] - joined.shape[0],
+        _removed_rows=old.shape[0] - joined.shape[0],
+        _equal_rows=equal_rows,
+        _unequal_rows=joined.shape[0] - equal_rows,
+        _example_added_rows=added_rows.to_dict(orient="records"),  # type: ignore
+        _example_removed_rows=removed_rows.to_dict(orient="records"),  # type: ignore
+    )
+
 
 def _is_increasing(x: pl.Expr, strict: bool = False) -> pl.Expr:
     """
