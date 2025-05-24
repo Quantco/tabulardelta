@@ -15,19 +15,17 @@ from tabulardelta.comparators.tabulardelta_dataclasses import (
     TabularDelta,
 )
 
-# TODO
 LOSSLESS_CONV = {
-    "int8": {"int16", "int32", "int64", "object"},
-    "int16": {"int32", "int64", "object"},
-    "int32": {"int64", "object"},
-    "int64": {"object"},
-    "uint8": {"uint16", "uint32", "uint64", "object"},
-    "uint16": {"uint32", "uint64", "object"},
-    "uint32": {"uint64", "object"},
-    "uint64": {"object"},
-    "float32": {"float64", "object"},
-    "float64": {"object"},
-    # String dtypes are currently (2024-05-10) experimental and hard to compare.
+    "Int8": {"Int16", "Int32", "Int64", "String"},
+    "Int16": {"Int32", "Int64", "String"},
+    "Int32": {"Int64", "String"},
+    "Int64": {"object"},
+    "UInt8": {"UInt16", "UInt32", "UInt64", "String"},
+    "UInt16": {"UInt32", "UInt64", "String"},
+    "UInt32": {"UInt64", "String"},
+    "UInt64": {"String"},
+    "Float32": {"Float64", "String"},
+    "Float64": {"String"},
 }
 
 @dataclass(frozen=True)
@@ -220,10 +218,10 @@ def compare_polars(
     cast_new = {c for c in changed if new_dt[c] in LOSSLESS_CONV.get(old_dt[c], set())}
     unsupported = changed - cast_old - cast_new
     for col in cast_old | cast_new:
-        _cast(
+        joined = _cast(
             joined, col + suffixes[0], new_dt[col] if col in cast_new else old_dt[col]
         )
-        _cast(
+        joined = _cast(
             joined, col + suffixes[1], new_dt[col] if col in cast_new else old_dt[col]
         )
     for col in unsupported:
@@ -231,13 +229,13 @@ def compare_polars(
             joined, join_columns, col, suffixes, old_dt, new_dt, True
         )
         dtype_changes.append(change)
-        joined.drop(columns=[col + suffixes[0], col + suffixes[1]], inplace=True)
+        joined = joined.drop([col + suffixes[0], col + suffixes[1]])
     cols -= unsupported
 
     # 4. Compare values
     column_changes = []
     for col in cols:
-        left, right = joined[col + suffixes[0]], joined[col + suffixes[1]]
+        left, right = joined.get_column(col + suffixes[0]), joined.get_column(col + suffixes[1])
         if joined.dtypes[col + suffixes[0]] in ["float32", "float64"]:
             joined[col + "_equal"] = np.isclose(
                 left, right, float_rtol, float_atol, True
@@ -289,3 +287,16 @@ def _is_increasing(x: pl.Expr, strict: bool = False) -> pl.Expr:
         return (x.diff() > 0.0).all()
     else:
         return (x.diff() >= 0.0).all()
+
+def _cast(df: pl.DataFrame, col: str, dtype: str) -> pl.DataFrame:
+    """Cast object into comparable dtype.
+    """
+    return df.cast({col: dtype})
+
+def _value_change(
+    df: pl.DataFrame, join_cols: list[str], col: str, suffixes: list[str], old_dt: dict[str, str], new_dt: dict[str, str], incomparable: bool = False
+) -> ColumnPair:
+    """Create ColumnChange object for one column in a given DataFrame."""
+    diff = df.select(join_cols + [col + suffixes[0], col + suffixes[1]]).rename(columns={col + suffixes[1]: col}).with_columns(_count=pl.lit(1))
+    combined = col, old_dt[col], col, new_dt[col], False
+    return ColumnPair.from_str(*combined, incomparable, diff)

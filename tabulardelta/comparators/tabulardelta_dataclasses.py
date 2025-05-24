@@ -10,7 +10,7 @@ from functools import cached_property
 from typing import Any
 
 import pandas as pd
-
+import polars as pl
 try:
     import sqlalchemy as sa
 except ImportError as e:
@@ -88,7 +88,7 @@ class ColumnPair:
     incomparable: bool = False
     """Whether data types of column in old and new table are incomparable."""
 
-    _values: pd.DataFrame | None = None
+    _values: pd.DataFrame | pl.DataFrame | None = None
 
     @property
     def old(self) -> Column:
@@ -163,7 +163,7 @@ class ColumnPair:
         new_type: str | None = None,
         join: bool = False,
         incomparable: bool = False,
-        _values: pd.DataFrame | None = None,
+        _values: pd.DataFrame | pl.DataFrame | None = None,
     ) -> ColumnPair:
         """Creates TabularDelta.ColumnPair using column names and types.
 
