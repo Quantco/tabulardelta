@@ -5,10 +5,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from logging import warn
 from typing import Any
 
 import numpy as np
 import polars as pl
+from polars.polars import SchemaError
 
 from tabulardelta.comparators.tabulardelta_dataclasses import (
     ColumnPair,
@@ -90,8 +92,11 @@ def _join(
         raise Exception("Datatypes of join columns changed. Cannot join dataframes for comparison."
                         f" Old dtypes {old.select(join_cols).dtypes}, "
                         f"New dtypes {old.select(join_cols).dtypes}")
+    try:
+        outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
+    except SchemaError:
+        raise ValueError("Datatype of join columns changed. Cannot join dataframes.")
 
-    outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
     in_old_and_new = set(old.columns) & set(new.columns)
     outer = outer.rename({col: f"{col}{suffixes[0]}" for col in in_old_and_new})
     if outer.select(*[f"{col}{suf}" for col in join_cols for suf in suffixes]).is_duplicated().any():
@@ -113,7 +118,7 @@ def _join(
     removed_rows = old.join(removed_rows, on=join_cols, how="inner")
 
     # Joined rows are in both
-    joined = outer.filter(row_in_old & row_in_new)
+    joined = outer.filter(row_in_old & row_in_new).drop([f"{col}{suffixes[1]}" for col in join_cols]).rename({f"{col}{suffixes[0]}": col for col in join_cols})
     return added_rows, removed_rows, joined
 
 def compare_polars(
@@ -291,12 +296,12 @@ def _is_increasing(x: pl.Expr, strict: bool = False) -> pl.Expr:
 def _cast(df: pl.DataFrame, col: str, dtype: str) -> pl.DataFrame:
     """Cast object into comparable dtype.
     """
-    return df.cast({col: dtype})
+    return df.cast({col: getattr(pl, dtype)})
 
 def _value_change(
     df: pl.DataFrame, join_cols: list[str], col: str, suffixes: list[str], old_dt: dict[str, str], new_dt: dict[str, str], incomparable: bool = False
 ) -> ColumnPair:
     """Create ColumnChange object for one column in a given DataFrame."""
-    diff = df.select(join_cols + [col + suffixes[0], col + suffixes[1]]).rename(columns={col + suffixes[1]: col}).with_columns(_count=pl.lit(1))
+    diff = df.select(join_cols + [col + suffixes[0], col + suffixes[1]]).rename({col + suffixes[1]: col}).with_columns(_count=pl.lit(1))
     combined = col, old_dt[col], col, new_dt[col], False
     return ColumnPair.from_str(*combined, incomparable, diff)

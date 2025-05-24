@@ -524,7 +524,7 @@ def new_pl_df():
         renamedmeasurement=pl.col("measurement"),
         results=pl.col("measurement").list.sum() / pl.col("measurement").list.len(),
         expectation=pl.col("expectation").cast(pl.Float32),
-        # id=pl.col("id").cast(pl.Float64),
+        id=pl.col("id").cast(pl.Float64),
         second_result=(pl.col("measurement").list.sum() / pl.col("measurement").list.len()).cast(pl.Float32),
     ).drop(["unnecessary", "measurement"])
 
@@ -536,9 +536,9 @@ def new_pl_df():
 
     df = pl.concat([
         df,
-        pl.DataFrame({"id": 10, "equal": 0, "paid": True, "name": "Karl", "expectation": 0.9, "renamedmeasurement": [[1.0, 1.1, 1.2]], "results": 1.1, "second_result": 1.1}).cast({"equal": pl.Int64, "expectation": pl.Float32, "second_result": pl.Float32, "id": pl.Int64})
+        pl.DataFrame({"id": 10.0, "equal": 0, "paid": True, "name": "Karl", "expectation": 0.9, "renamedmeasurement": [[1.0, 1.1, 1.2]], "results": 1.1, "second_result": 1.1}).cast({"equal": pl.Int64, "expectation": pl.Float32, "second_result": pl.Float32, "id": pl.Float64})
     ])
     return df
 
 def test_polars_comparator():
-    delta = PolarsComparator(["id"]).compare(old_pl_df(), new_pl_df())
+    delta = PolarsComparator(["name"]).compare(old_pl_df(), new_pl_df())
