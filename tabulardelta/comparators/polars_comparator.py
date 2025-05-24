@@ -238,17 +238,19 @@ def compare_polars(
     cols -= unsupported
 
     # 4. Compare values
+    dtypes_compare_values = {col : dtype for col, dtype in zip(joined.columns, joined.dtypes)}
     column_changes = []
     for col in cols:
         left, right = joined.get_column(col + suffixes[0]), joined.get_column(col + suffixes[1])
-        if joined.dtypes[col + suffixes[0]] in ["float32", "float64"]:
-            joined[col + "_equal"] = np.isclose(
+        if dtypes_compare_values[col + suffixes[0]] in ["Float32", "Float64"]:
+            joined = joined.with_columns(pl.Series(name=col + "_equal", values=np.isclose(
                 left, right, float_rtol, float_atol, True
-            )
+            )))
         else:
-            joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(
-                left
-            ) & pd.isna(right)
+            # joined = joined.with_columns(pl.Series(name=col + "_equal", values=
+            # joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(
+            #     left
+            # ) & pd.isna(right)
         unequal = joined[~joined[col + "_equal"].astype("bool")]
         change = _value_change(unequal, join_columns, col, suffixes, old_dt, new_dt)
         if len(change) > 0:
