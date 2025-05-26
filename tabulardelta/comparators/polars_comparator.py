@@ -247,16 +247,17 @@ def compare_polars(
                 left, right, float_rtol, float_atol, True
             )))
         else:
-            # joined = joined.with_columns(pl.Series(name=col + "_equal", values=
-            # joined[col + "_equal"] = (left == right).fillna(False) | pd.isna(
-            #     left
-            # ) & pd.isna(right)
-        unequal = joined[~joined[col + "_equal"].astype("bool")]
+            joined = joined.with_columns(pl.Series(name=col + "_equal", values=(left==right).fill_null(False) | (left.is_null() & right.is_null())))
+        unequal = joined.filter(~pl.col(col + "_equal"))
         change = _value_change(unequal, join_columns, col, suffixes, old_dt, new_dt)
         if len(change) > 0:
             column_changes.append(change)
-    joined["_equal"] = joined[[col + "_equal" for col in cols]].agg("all", axis=1)
-    equal_rows = joined[["_equal"]].value_counts().get(True, 0)
+    joined = joined.with_columns(_equal=pl.all_horizontal(*[col + "_equal" for col in cols]))
+    equal_rows = joined.get_column("_equal").value_counts().filter(pl.col("_equal")).get_column("count")
+    if len(equal_rows) == 0:
+        equal_rows = 0
+    else:
+        equal_rows = equal_rows[0]
 
     # 5. Return DataFrameDiff
     ren_cols = [
@@ -280,8 +281,8 @@ def compare_polars(
         _removed_rows=old.shape[0] - joined.shape[0],
         _equal_rows=equal_rows,
         _unequal_rows=joined.shape[0] - equal_rows,
-        _example_added_rows=added_rows.to_dict(orient="records"),  # type: ignore
-        _example_removed_rows=removed_rows.to_dict(orient="records"),  # type: ignore
+        _example_added_rows=added_rows.to_dict(as_series=False),
+        _example_removed_rows=removed_rows.to_dict(as_series=False),
     )
 
 
