@@ -242,7 +242,7 @@ def compare_polars(
     column_changes = []
     for col in cols:
         left, right = joined.get_column(col + suffixes[0]), joined.get_column(col + suffixes[1])
-        if dtypes_compare_values[col + suffixes[0]] in ["Float32", "Float64"]:
+        if dtypes_compare_values[col + suffixes[0]] in [pl.Float32, pl.Float64]:
             joined = joined.with_columns(pl.Series(name=col + "_equal", values=np.isclose(
                 left, right, float_rtol, float_atol, True
             )))
@@ -281,8 +281,8 @@ def compare_polars(
         _removed_rows=old.shape[0] - joined.shape[0],
         _equal_rows=equal_rows,
         _unequal_rows=joined.shape[0] - equal_rows,
-        _example_added_rows=added_rows.to_dict(as_series=False),
-        _example_removed_rows=removed_rows.to_dict(as_series=False),
+        _example_added_rows=added_rows.to_dicts(),
+        _example_removed_rows=removed_rows.to_dicts(),
     )
 
 

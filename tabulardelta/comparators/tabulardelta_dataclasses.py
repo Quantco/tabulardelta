@@ -239,7 +239,7 @@ class ColumnPair:
             join_cols = set(self._values.columns) - set(self._required)
             agg_changes = self._values.group_by(group_by_cols).agg(pl.col("_count").sum().alias("_count"), *[pl.col(col).first().alias(col) for col in join_cols]).sort("_count", descending=True)
             actual_changes = ~pl.col(self._df_old_name).is_null() | ~pl.col(self.new.name).is_null()
-            self._values = agg_changes.with_columns(actual_changes=actual_changes).filter(actual_changes).drop("actual_changes")
+            self._values = agg_changes.with_columns(actual_changes=actual_changes).filter(actual_changes).drop("actual_changes").cast({"_count" : pl.Int64})
         else:
             raise ValueError(f"Got unsupported dataframe type: {type(self._values)}")
 
