@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
+
 try:
     import sqlalchemy as sa
 except ImportError as e:
@@ -112,9 +113,21 @@ class ColumnPair:
 
     def __iter__(self) -> Iterator[ChangedValue]:
         """Examples of value changes."""
-        for idx, row in self._values.iterrows() if self._values is not None else []:
-            index = {k: v for k, v in row.to_dict().items() if k not in self._required}
-            yield ChangedValue(index, *[row[key] for key in self._required])
+
+        if isinstance(self._values, pd.DataFrame):
+            for idx, row in self._values.iterrows() if self._values is not None else []:
+                index = {
+                    k: v for k, v in row.to_dict().items() if k not in self._required
+                }
+                yield ChangedValue(index, *[row[key] for key in self._required])
+        if isinstance(self._values, pl.DataFrame):
+            for row in (
+                self._values.iter_rows(named=True) if self._values is not None else []
+            ):
+                index = {k: v for k, v in row.items() if k not in self._required}
+                yield ChangedValue(index, *[row[key] for key in self._required])
+        else:
+            raise ValueError(f"Got unsupported dataframe type: {type(self._values)}")
 
     def __len__(self) -> int:
         """Total number of changes."""
@@ -126,7 +139,7 @@ class ColumnPair:
         new: sa.sql.ColumnElement[Any] | None = None,
         join: bool = False,
         incomparable: bool = False,
-        _values: pd.DataFrame | None = None,
+        _values: pd.DataFrame | pl.DataFrame | None = None,
     ) -> ColumnPair:
         """Creates TabularDelta.ColumnPair using SQLAlchemy columns.
 
@@ -230,19 +243,36 @@ class ColumnPair:
 
             # Compactify dataframe by grouping equal changes together
             groupby = self._values.groupby(group_by_cols, as_index=False, dropna=False)
-            join_cols = {c: (c, "first") for c in set(self._values) - set(self._required)}
+            join_cols = {
+                c: (c, "first") for c in set(self._values) - set(self._required)
+            }
             agg = groupby.agg(_count=("_count", "sum"), **join_cols)  # type: ignore
             sort = agg.sort_values(by="_count", ascending=False)
-            actual_changes = ~sort[self._df_old_name].isna() | ~sort[self.new.name].isna()
+            actual_changes = (
+                ~sort[self._df_old_name].isna() | ~sort[self.new.name].isna()
+            )
             self._values = sort[actual_changes]
         elif isinstance(self._values, pl.DataFrame):
             join_cols = set(self._values.columns) - set(self._required)
-            agg_changes = self._values.group_by(group_by_cols).agg(pl.col("_count").sum().alias("_count"), *[pl.col(col).first().alias(col) for col in join_cols]).sort("_count", descending=True)
-            actual_changes = ~pl.col(self._df_old_name).is_null() | ~pl.col(self.new.name).is_null()
-            self._values = agg_changes.with_columns(actual_changes=actual_changes).filter(actual_changes).drop("actual_changes").cast({"_count" : pl.Int64})
+            agg_changes = (
+                self._values.group_by(group_by_cols)
+                .agg(
+                    pl.col("_count").sum().alias("_count"),
+                    *[pl.col(col).first().alias(col) for col in join_cols],
+                )
+                .sort("_count", descending=True)
+            )
+            actual_changes = (
+                ~pl.col(self._df_old_name).is_null() | ~pl.col(self.new.name).is_null()
+            )
+            self._values = (
+                agg_changes.with_columns(actual_changes=actual_changes)
+                .filter(actual_changes)
+                .drop("actual_changes")
+                .cast({"_count": pl.Int64})
+            )
         else:
             raise ValueError(f"Got unsupported dataframe type: {type(self._values)}")
-
 
 
 @dataclass(frozen=True)

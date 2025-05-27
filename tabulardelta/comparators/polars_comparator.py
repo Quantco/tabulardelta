@@ -5,8 +5,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from logging import warn
-from typing import Any
 
 import numpy as np
 import polars as pl
@@ -29,6 +27,7 @@ LOSSLESS_CONV = {
     "Float32": {"Float64", "String"},
     "Float64": {"String"},
 }
+
 
 @dataclass(frozen=True)
 class PolarsComparator:
@@ -89,9 +88,11 @@ def _join(
     types, since outer join adds Nones.
     """
     if old.select(join_cols).dtypes != old.select(join_cols).dtypes:
-        raise Exception("Datatypes of join columns changed. Cannot join dataframes for comparison."
-                        f" Old dtypes {old.select(join_cols).dtypes}, "
-                        f"New dtypes {old.select(join_cols).dtypes}")
+        raise Exception(
+            "Datatypes of join columns changed. Cannot join dataframes for comparison."
+            f" Old dtypes {old.select(join_cols).dtypes}, "
+            f"New dtypes {old.select(join_cols).dtypes}"
+        )
     try:
         outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
     except SchemaError:
@@ -99,7 +100,11 @@ def _join(
 
     in_old_and_new = set(old.columns) & set(new.columns)
     outer = outer.rename({col: f"{col}{suffixes[0]}" for col in in_old_and_new})
-    if outer.select(*[f"{col}{suf}" for col in join_cols for suf in suffixes]).is_duplicated().any():
+    if (
+        outer.select(*[f"{col}{suf}" for col in join_cols for suf in suffixes])
+        .is_duplicated()
+        .any()
+    ):
         raise KeyError(f"Join columns {join_cols} are not unique.")
 
     row_in_old = pl.lit(True)
@@ -110,16 +115,29 @@ def _join(
         row_in_new &= pl.col(f"{col}{suffixes[1]}").is_not_null()
 
     # Added rows are in new but not in old
-    added_rows = outer.filter(~row_in_old & row_in_new).select(*[f"{col}{suffixes[1]}" for col in join_cols]).rename({f"{col}{suffixes[1]}": col for col in join_cols})
+    added_rows = (
+        outer.filter(~row_in_old & row_in_new)
+        .select(*[f"{col}{suffixes[1]}" for col in join_cols])
+        .rename({f"{col}{suffixes[1]}": col for col in join_cols})
+    )
     added_rows = new.join(added_rows, on=join_cols, how="inner")
 
     # Removed rows are in old but not in new
-    removed_rows = outer.filter(row_in_old & ~row_in_new).select(*[f"{col}{suffixes[0]}" for col in join_cols]).rename({f"{col}{suffixes[0]}": col for col in join_cols})
+    removed_rows = (
+        outer.filter(row_in_old & ~row_in_new)
+        .select(*[f"{col}{suffixes[0]}" for col in join_cols])
+        .rename({f"{col}{suffixes[0]}": col for col in join_cols})
+    )
     removed_rows = old.join(removed_rows, on=join_cols, how="inner")
 
     # Joined rows are in both
-    joined = outer.filter(row_in_old & row_in_new).drop([f"{col}{suffixes[1]}" for col in join_cols]).rename({f"{col}{suffixes[0]}": col for col in join_cols})
+    joined = (
+        outer.filter(row_in_old & row_in_new)
+        .drop([f"{col}{suffixes[1]}" for col in join_cols])
+        .rename({f"{col}{suffixes[0]}": col for col in join_cols})
+    )
     return added_rows, removed_rows, joined
+
 
 def compare_polars(
     old: pl.DataFrame,
@@ -238,22 +256,43 @@ def compare_polars(
     cols -= unsupported
 
     # 4. Compare values
-    dtypes_compare_values = {col : dtype for col, dtype in zip(joined.columns, joined.dtypes)}
+    dtypes_compare_values = {
+        col: dtype for col, dtype in zip(joined.columns, joined.dtypes)
+    }
     column_changes = []
     for col in cols:
-        left, right = joined.get_column(col + suffixes[0]), joined.get_column(col + suffixes[1])
+        left, right = (
+            joined.get_column(col + suffixes[0]),
+            joined.get_column(col + suffixes[1]),
+        )
         if dtypes_compare_values[col + suffixes[0]] in [pl.Float32, pl.Float64]:
-            joined = joined.with_columns(pl.Series(name=col + "_equal", values=np.isclose(
-                left, right, float_rtol, float_atol, True
-            )))
+            joined = joined.with_columns(
+                pl.Series(
+                    name=col + "_equal",
+                    values=np.isclose(left, right, float_rtol, float_atol, True),
+                )
+            )
         else:
-            joined = joined.with_columns(pl.Series(name=col + "_equal", values=(left==right).fill_null(False) | (left.is_null() & right.is_null())))
+            joined = joined.with_columns(
+                pl.Series(
+                    name=col + "_equal",
+                    values=(left == right).fill_null(False)
+                    | (left.is_null() & right.is_null()),
+                )
+            )
         unequal = joined.filter(~pl.col(col + "_equal"))
         change = _value_change(unequal, join_columns, col, suffixes, old_dt, new_dt)
         if len(change) > 0:
             column_changes.append(change)
-    joined = joined.with_columns(_equal=pl.all_horizontal(*[col + "_equal" for col in cols]))
-    equal_rows = joined.get_column("_equal").value_counts().filter(pl.col("_equal")).get_column("count")
+    joined = joined.with_columns(
+        _equal=pl.all_horizontal(*[col + "_equal" for col in cols])
+    )
+    equal_rows = (
+        joined.get_column("_equal")
+        .value_counts()
+        .filter(pl.col("_equal"))
+        .get_column("count")
+    )
     if len(equal_rows) == 0:
         equal_rows = 0
     else:
@@ -296,15 +335,26 @@ def _is_increasing(x: pl.Expr, strict: bool = False) -> pl.Expr:
     else:
         return (x.diff() >= 0.0).all()
 
+
 def _cast(df: pl.DataFrame, col: str, dtype: str) -> pl.DataFrame:
-    """Cast object into comparable dtype.
-    """
+    """Cast object into comparable dtype."""
     return df.cast({col: getattr(pl, dtype)})
 
+
 def _value_change(
-    df: pl.DataFrame, join_cols: list[str], col: str, suffixes: list[str], old_dt: dict[str, str], new_dt: dict[str, str], incomparable: bool = False
+    df: pl.DataFrame,
+    join_cols: list[str],
+    col: str,
+    suffixes: list[str],
+    old_dt: dict[str, str],
+    new_dt: dict[str, str],
+    incomparable: bool = False,
 ) -> ColumnPair:
     """Create ColumnChange object for one column in a given DataFrame."""
-    diff = df.select(join_cols + [col + suffixes[0], col + suffixes[1]]).rename({col + suffixes[1]: col}).with_columns(_count=pl.lit(1))
+    diff = (
+        df.select(join_cols + [col + suffixes[0], col + suffixes[1]])
+        .rename({col + suffixes[1]: col})
+        .with_columns(_count=pl.lit(1))
+    )
     combined = col, old_dt[col], col, new_dt[col], False
     return ColumnPair.from_str(*combined, incomparable, diff)
