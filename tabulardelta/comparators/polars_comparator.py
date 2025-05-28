@@ -96,6 +96,7 @@ def _join(
     try:
         outer = old.join(new, on=join_cols, how="outer", suffix=suffixes[1])
     except SchemaError:
+        # TODO[DZ]: First try a lossless conversion before giving up
         raise ValueError("Datatype of join columns changed. Cannot join dataframes.")
 
     in_old_and_new = set(old.columns) & set(new.columns)
