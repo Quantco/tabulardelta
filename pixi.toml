@@ -44,7 +44,7 @@ test-coverage = "pytest --cov=tabulardelta --cov-report=xml --cov-report=term-mi
 python-build = "*"
 twine = "*"
 [feature.build.tasks]
-build-wheel = "python -m build --no-isolation ."
+wheel = "python -m build --no-isolation ."
 twine-check = "twine check dist/*"
 
 [feature.lint.dependencies]
