@@ -92,7 +92,7 @@ class MsSqlContainer(BaseModel):
                 cursor.execute("SELECT 1")
                 cnn.commit()
                 logging.info(
-                    f"Connecting to docker mssql, attempt {attempt} success after {time.time()-t:.2f}s"
+                    f"Connecting to docker mssql, attempt {attempt} success after {time.time() - t:.2f}s"
                 )
                 return self
             except Exception:
