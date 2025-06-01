@@ -41,7 +41,7 @@ test = "pytest"
 test-coverage = "pytest --cov=tabulardelta --cov-report=xml --cov-report=term-missing"
 
 [feature.build.dependencies]
-python-build = "*"
+python-build = { version = "*", source = "pip" }
 twine = "*"
 [feature.build.tasks]
 build-wheel = "python -m build --no-isolation ."
@@ -83,8 +83,6 @@ lint = { features = ["lint"], no-default-feature = true }
 libgfortran5 = ">=14"
 ld64 = ">=951.9"
 
-
 [target.osx-arm64.dependencies]
 libgfortran5 = ">=14"
 ld64 = ">=951.9"
-
