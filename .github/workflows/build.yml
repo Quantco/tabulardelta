@@ -20,7 +20,7 @@ jobs:
         with:
           environments: build
       - name: Build project
-        run: pixi run -e build wheel
+        run: pixi run -e build build-wheel
       - name: Check build artifact
         run: pixi run -e build twine-check
       - name: Upload package
