@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ def get_random_tabulardelta(gen: np.random.Generator):
     ) -> ColumnPair:
         if chg.old is None or chg.new is None:
             raise ValueError("Can't generate values for non-matched columns.")
-        size = gen.integers(0, 2 ** gen.integers(0, 10))
+        size = cast(int, gen.integers(0, 2 ** gen.integers(0, 10)))
         old_renamed = Column(
             chg.old.name + ("_old" if chg.old.name == chg.new.name else ""),
             chg.old.type,
@@ -145,12 +145,12 @@ def get_random_tabulardelta(gen: np.random.Generator):
         warnings,
         [],
         added + removed + join + type_changes + col_differences,
-        old_rows,
-        new_rows,
+        cast(int, old_rows),
+        cast(int, new_rows),
         added_rows,
         removed_rows,
         equal_rows,
-        unequal_rows,
+        cast(int, unequal_rows),
         _example_added_rows=gen_rows(
             gen.choice([1, 5, 15]), gen.choice([0, 10, min(added_rows, 100)])
         ),

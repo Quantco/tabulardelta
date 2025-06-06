@@ -68,7 +68,7 @@ class MsSqlContainer(BaseModel):
 
     def sqlalchemy_url(self) -> str:
         # If no port is set, try using CI windows connection string:
-        host = f"localhost:{self.port}" if self.port else r"(localdb)\.\MSSQLLocalDB"
+        host = f"127.0.0.1:{self.port}" if self.port else r"(localdb)\.\MSSQLLocalDB"
         return f"mssql+pyodbc://sa:Passw0rd@{host}/master?Encrypt=no&TrustServerCertificate=yes&driver=ODBC+Driver+17+for+SQL+Server"
 
     def sqlalchemy_engine(self) -> sa.Engine:
@@ -76,7 +76,7 @@ class MsSqlContainer(BaseModel):
 
     def pyodbc_connect(self) -> pyodbc.Connection:
         # If no port is set, try using CI windows connection string:
-        host = f"localhost,{self.port}" if self.port else r"(localdb)\.\MSSQLLocalDB"
+        host = f"127.0.0.1,{self.port}" if self.port else r"(localdb)\.\MSSQLLocalDB"
         pyodbc_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={host};DATABASE=master;UID=sa;PWD=Passw0rd;TrustServerCertificate=yes;Encrypt=No;DATABASE=master"
         return pyodbc.connect(pyodbc_str)
 
@@ -92,7 +92,7 @@ class MsSqlContainer(BaseModel):
                 cursor.execute("SELECT 1")
                 cnn.commit()
                 logging.info(
-                    f"Connecting to docker mssql, attempt {attempt} success after {time.time()-t:.2f}s"
+                    f"Connecting to docker mssql, attempt {attempt} success after {time.time() - t:.2f}s"
                 )
                 return self
             except Exception:

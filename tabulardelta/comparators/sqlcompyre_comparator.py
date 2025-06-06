@@ -96,8 +96,12 @@ class SqlCompyreComparator:
         removed_rows = _get_sample(self.engine, rows.unjoined_left, self.row_samples)
 
         return TabularDelta(
-            new if isinstance(new, str) else getattr(right.original, "name", ""),
-            old if isinstance(old, str) else getattr(left.original, "name", ""),
+            new
+            if isinstance(new, str)
+            else getattr(getattr(right, "original"), "name", ""),
+            old
+            if isinstance(old, str)
+            else getattr(getattr(left, "original"), "name", ""),
             _columns=incomparable + comparable + uncompared,
             _old_rows=comp.row_counts.left,
             _new_rows=comp.row_counts.right,
@@ -176,9 +180,13 @@ def _get_value_change(
     original_new = tab_comp.right_table.c[new_name]
     original_old = tab_comp.left_table.c[name]
     if comparable:
-        diffs: sa.FromClauseRole = tab_comp.column_matches.mismatch_selects[name]
+        diffs: sa.sql.FromClause = tab_comp.column_matches.mismatch_selects[
+            name
+        ].subquery()
         cols = diffs.c
-        new_col = diffs.c[new_name + ("_1" if new_name == name else "")].label(new_name)
+        new_col: sa.sql.expression.ColumnElement = diffs.c[
+            new_name + ("_1" if new_name == name else "")
+        ].label(new_name)
     else:
         cols = tab_comp.left_table.c
         _join = [cols[c] == tab_comp.right_table.c[c] for c in tab_comp.join_columns]
