@@ -154,7 +154,7 @@ def _value_change(
     diff.rename(columns={col + suffixes[1]: col}, inplace=True)
     diff["_count"] = 1
     combined = col, old_dt[col], col, new_dt[col], False
-    return ColumnPair.from_str(*combined, incomparable, diff)
+    return ColumnPair.from_str(*combined, incomparable, diff.to_dict("records"))
 
 
 def compare_pandas(

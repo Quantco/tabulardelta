@@ -96,12 +96,16 @@ class SqlCompyreComparator:
         removed_rows = _get_sample(self.engine, rows.unjoined_left, self.row_samples)
 
         return TabularDelta(
-            new
-            if isinstance(new, str)
-            else getattr(getattr(right, "original"), "name", ""),
-            old
-            if isinstance(old, str)
-            else getattr(getattr(left, "original"), "name", ""),
+            (
+                new
+                if isinstance(new, str)
+                else getattr(getattr(right, "original"), "name", "")
+            ),
+            (
+                old
+                if isinstance(old, str)
+                else getattr(getattr(left, "original"), "name", "")
+            ),
             _columns=incomparable + comparable + uncompared,
             _old_rows=comp.row_counts.left,
             _new_rows=comp.row_counts.right,
@@ -208,8 +212,9 @@ def _get_value_change(
     except (sa.exc.ProgrammingError, sa.exc.DataError):
         warn(f"Couldn't get value change for {name}.")
         result = pd.DataFrame({old_name: None, new_name: None, "_count": [total]})
+    result.columns = result.columns.astype(str)
     return ColumnPair.from_sqlalchemy(
-        original_old, original_new, False, not comparable, result
+        original_old, original_new, False, not comparable, result.to_dict("records")
     )
 
 

@@ -140,8 +140,9 @@ def test_pandas_comparator():
     assert "paid" in incomparable_dtype_dict
     assert incomparable_dtype_dict["paid"][2] == "object"
     assert incomparable_dtype_dict["paid"][3] == "bool"
-    assert isinstance(incomparable_dtype_dict["paid"][4], pd.DataFrame)
-    cols = incomparable_dtype_dict["paid"][4].columns
+    assert incomparable_dtype_dict["paid"][4] is not None
+    assert len(incomparable_dtype_dict["paid"][4]) > 0
+    cols = incomparable_dtype_dict["paid"][4][0].keys()
     assert "name" in cols
     assert "_count" in cols
     assert incomparable_dtype_dict["paid"][0] in cols
@@ -150,12 +151,13 @@ def test_pandas_comparator():
     assert "id" in incomparable_dtype_dict
     assert incomparable_dtype_dict["id"][2] == "int64"
     assert incomparable_dtype_dict["id"][3] == "float64"
-    assert isinstance(incomparable_dtype_dict["id"][4], pd.DataFrame)
-    cols = incomparable_dtype_dict["id"][4].columns
+    assert incomparable_dtype_dict["id"][4] is not None
+    assert len(incomparable_dtype_dict["id"][4]) > 0
+    cols = incomparable_dtype_dict["id"][4][0].keys()
     assert "name" in cols
     assert "_count" in cols
-    assert incomparable_dtype_dict["id"][0] in incomparable_dtype_dict["id"][4].columns
-    assert incomparable_dtype_dict["id"][1] in incomparable_dtype_dict["id"][4].columns
+    assert incomparable_dtype_dict["id"][0] in cols
+    assert incomparable_dtype_dict["id"][1] in cols
 
     assert len(delta.rows.old) == 10
     assert len(delta.rows.new) == 11
@@ -209,19 +211,21 @@ def test_pandas_comparator():
     actual_differences = [diff for diff in delta.cols.differences if len(diff) > 0]
     assert len(actual_differences) == 1
     assert actual_differences[0].new and actual_differences[0].new.name == "expectation"
-    df = actual_differences[0]._values
-    assert df is not None
-    assert actual_differences[0].old and actual_differences[0].old.name in df.columns
-    assert actual_differences[0].new and actual_differences[0].new.name in df.columns
+    changes = actual_differences[0]._values
+    assert changes is not None
+    assert len(changes) > 0
+    cols = changes[0].keys()
+    assert actual_differences[0].old and actual_differences[0].old.name in cols
+    assert actual_differences[0].new and actual_differences[0].new.name in cols
     expected_df = pd.DataFrame(
         {
+            "name": ["E"],
             "expectation_old": [0.5],
             "expectation": [0.55],
             "_count": [1],
-            "name": ["E"],
         }
     )
-    assert_frame_equal(df.reset_index(drop=True), expected_df.reset_index(drop=True))
+    assert_frame_equal(pd.DataFrame(changes), expected_df.reset_index(drop=True))
 
 
 def test_pandas_comparator_row_col_orders():
@@ -323,8 +327,9 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
         == 'VARCHAR COLLATE "SQL_Latin1_General_CP1_CI_AS"'
     )
     assert incomparable_dtype_dict["paid"][3] == "BIT"
-    assert isinstance(incomparable_dtype_dict["paid"][4], pd.DataFrame)
-    cols = incomparable_dtype_dict["paid"][4].columns
+    assert incomparable_dtype_dict["paid"][4] is not None
+    assert len(incomparable_dtype_dict["paid"][4]) > 0
+    cols = incomparable_dtype_dict["paid"][4][0].keys()
     assert "name" in cols
     assert "_count" in cols
     assert incomparable_dtype_dict["paid"][0] in cols
@@ -377,20 +382,21 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
     assert actual_differences[0].new
     assert actual_differences[0].old
     assert actual_differences[0].new.name == "expectation"
-    df = actual_differences[0]._values
-    assert df is not None
-    assert actual_differences[0].old.name in df.columns
-    assert actual_differences[0].new.name in df.columns
+    diff_values = actual_differences[0]._values
+    assert diff_values is not None
+    assert len(diff_values) > 0
+    assert actual_differences[0].old.name in diff_values[0].keys()
+    assert actual_differences[0].new.name in diff_values[0].keys()
     expected = pd.DataFrame(
         {
-            "expectation_old": [0.5],
             "expectation": [0.55],
+            "expectation_old": [0.5],
             "_count": [1],
             "name": ["E"],
         }
     )
     assert_frame_equal(
-        df.reset_index(drop=True), expected.reset_index(drop=True), check_dtype=False
+        pd.DataFrame(diff_values), expected.reset_index(drop=True), check_dtype=False
     )
 
 

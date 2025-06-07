@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
-import pandas as pd
-
 try:
     import sqlalchemy as sa
 except ImportError as e:
@@ -88,7 +86,7 @@ class ColumnPair:
     incomparable: bool = False
     """Whether data types of column in old and new table are incomparable."""
 
-    _values: pd.DataFrame | None = None
+    _values: list[dict[Any, Any]] | None = None
 
     @property
     def old(self) -> Column:
@@ -112,13 +110,13 @@ class ColumnPair:
 
     def __iter__(self) -> Iterator[ChangedValue]:
         """Examples of value changes."""
-        for idx, row in self._values.iterrows() if self._values is not None else []:
-            index = {k: v for k, v in row.to_dict().items() if k not in self._required}
+        for row in self._values or []:
+            index = {k: v for k, v in row.items() if k not in self._required}
             yield ChangedValue(index, *[row[key] for key in self._required])
 
     def __len__(self) -> int:
         """Total number of changes."""
-        return self._values["_count"].sum() if self._values is not None else 0
+        return sum(r["_count"] for r in self._values or [])
 
     @staticmethod
     def from_sqlalchemy(
@@ -126,7 +124,7 @@ class ColumnPair:
         new: sa.sql.ColumnElement[Any] | None = None,
         join: bool = False,
         incomparable: bool = False,
-        _values: pd.DataFrame | None = None,
+        _values: list[dict[Any, Any]] | None = None,
     ) -> ColumnPair:
         """Creates TabularDelta.ColumnPair using SQLAlchemy columns.
 
@@ -139,8 +137,8 @@ class ColumnPair:
                 Whether column was used as join column for comparison.
             incomparable :class:`bool`:
                 Whether data types of column in old and new table are incomparable.
-            _values :class:`pd.DataFrame`:
-                DataFrame with examples of value changes.
+            _values :class:`list[dict[Any, Any]]`:
+                List of rows with examples of value changes.
                 Contains old column, new column, :code:`_count` column,
                 and optionally other columns for identifying example rows.
 
@@ -163,7 +161,7 @@ class ColumnPair:
         new_type: str | None = None,
         join: bool = False,
         incomparable: bool = False,
-        _values: pd.DataFrame | None = None,
+        _values: list[dict[Any, Any]] | None = None,
     ) -> ColumnPair:
         """Creates TabularDelta.ColumnPair using column names and types.
 
@@ -180,11 +178,11 @@ class ColumnPair:
                 Whether column was used as join column for comparison.
             incomparable :class:`bool`:
                 Whether data types of column in old and new table are incomparable.
-            _values :class:`pd.DataFrame`:
-                DataFrame with examples of value changes.
+            _values :class:`list[dict[Any, Any]]`:
+                List of rows with examples of value changes.
                 Contains old column, new column, :code:`_count` column,
                 and optionally other columns for identifying example rows.
-                If the column wasn't renamed, the name of the old column in the DataFrame should
+                If the column wasn't renamed, the name of the old column should
                 be suffixed by :code:`_old`.
 
         Returns :class:`ColumnPair`:
@@ -200,7 +198,7 @@ class ColumnPair:
 
     @cached_property
     def _df_old_name(self) -> str:
-        """Name of the old column in the DataFrame.
+        """Name of the old column in the row list.
 
         Suffixed with :code:`_old` if column wasn't renamed.
         """
@@ -208,32 +206,28 @@ class ColumnPair:
 
     @cached_property
     def _required(self) -> tuple[str, str, str]:
-        """Required columns in the DataFrame."""
+        """Required columns in the row list."""
         return self._df_old_name, self.new.name, "_count"
 
     def __post_init__(self):
-        """Check if DataFrame contains required columns and compactifies it."""
-        if self._values is None:
+        """Check if row list contains required columns and compactifies it."""
+        if not self._values:
             return
 
-        if missing := set(self._required) - set(self._values.columns):
+        if missing := set(self._required) - self._values[0].keys():
             raise ValueError(f"Missing columns in comparison: {missing}")
 
-        group_by_cols = [self._df_old_name, self.new.name]
-
-        # DIRTY FIX FOR PANDAS BUG: Categorical in GroupBy leads to
-        # ValueError: Length of values (5) does not match length of index (25)
-        for col in group_by_cols:
-            if self._values[col].dtype.name == "category":
-                self._values[col] = self._values[col].astype("object")
-
-        # Compactify dataframe by grouping equal changes together
-        groupby = self._values.groupby(group_by_cols, as_index=False, dropna=False)
-        join_cols = {c: (c, "first") for c in set(self._values) - set(self._required)}
-        agg = groupby.agg(_count=("_count", "sum"), **join_cols)  # type: ignore
-        sort = agg.sort_values(by="_count", ascending=False)
-        actual_changes = ~sort[self._df_old_name].isna() | ~sort[self.new.name].isna()
-        self._values = sort[actual_changes]
+        known_changes: dict[tuple[Any, Any], dict[str, Any]] = {}
+        for row in self._values:
+            chg = (row[self._df_old_name], row[self.new.name])
+            if chg[0] != chg[0] and chg[1] != chg[1]:
+                # Skip placeholder row
+                continue
+            if chg in known_changes:
+                known_changes[chg]["_count"] += row["_count"]
+            else:
+                known_changes[chg] = row
+        self._values = sorted(known_changes.values(), key=lambda x: -x["_count"])
 
 
 @dataclass(frozen=True)
@@ -308,7 +302,7 @@ class Rows:
 
     count: int
     """Number of represented rows."""
-    examples: list[dict[str, Any]] | None
+    examples: list[dict[Any, Any]] | None
     """Optional examples of represented rows."""
 
     def __len__(self) -> int:
@@ -378,13 +372,13 @@ class TabularDelta:
     """Number of equal rows (joined and all columns unchanged)."""
     _unequal_rows: int = 0
     """Number of unequal rows (joined but at least one column changed)."""
-    _example_added_rows: list[dict[str, Any]] = field(default_factory=list)
+    _example_added_rows: list[dict[Any, Any]] = field(default_factory=list)
     """Optional examples of added rows (only in new table)."""
-    _example_removed_rows: list[dict[str, Any]] = field(default_factory=list)
+    _example_removed_rows: list[dict[Any, Any]] = field(default_factory=list)
     """Optional examples of removed rows (only in old table)."""
-    _example_equal_rows: list[dict[str, Any]] = field(default_factory=list)
+    _example_equal_rows: list[dict[Any, Any]] = field(default_factory=list)
     """Optional examples of equal rows (joined and all columns unchanged)."""
-    _example_unequal_rows: list[dict[str, Any]] = field(default_factory=list)
+    _example_unequal_rows: list[dict[Any, Any]] = field(default_factory=list)
     """Optional examples of unequal rows (joined but at least one column changed)."""
 
     @cached_property
