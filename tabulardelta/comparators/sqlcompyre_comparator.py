@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any, TypeVar
 from warnings import warn
 
-import pandas as pd
 import sqlalchemy as sa
 import sqlcompyre as sc
 from sqlcompyre.analysis import TableComparison
@@ -207,14 +206,17 @@ def _get_value_change(
     try:
         with tab_comp.engine.connect() as conn:
             total = conn.execute(sa.select(count).select_from(diffs)).scalar() or total
-        result = pd.read_sql(query, tab_comp.engine).astype("object")
-        result.loc[result.shape[0], "_count"] = total - result["_count"].sum()
-    except (sa.exc.ProgrammingError, sa.exc.DataError):
+            result_proxy = conn.execute(query)
+            columns = result_proxy.keys()
+            rows = result_proxy.fetchall()
+            result = [dict(zip(columns, row)) for row in rows]
+        result.append({k: float("nan") for k in result[0].keys()})
+        result[-1]["_count"] = total - sum(row["_count"] for row in result[:-1])
+    except (sa.exc.ProgrammingError, sa.exc.DataError, IndexError):
         warn(f"Couldn't get value change for {name}.")
-        result = pd.DataFrame({old_name: None, new_name: None, "_count": [total]})
-    result.columns = result.columns.astype(str)
+        result = [{old_name: float("nan"), new_name: float("nan"), "_count": [total]}]
     return ColumnPair.from_sqlalchemy(
-        original_old, original_new, False, not comparable, result.to_dict("records")
+        original_old, original_new, False, not comparable, result
     )
 
 
