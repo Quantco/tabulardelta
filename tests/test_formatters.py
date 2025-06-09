@@ -5,12 +5,17 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-import numpy as np
-import pandas as pd
-from numpy import (
-    dtype,
-    ndarray,
-)
+import pytest
+
+try:
+    import numpy as np
+    import pandas as pd
+    from numpy import (
+        dtype,
+        ndarray,
+    )
+except ImportError:
+    pass
 
 from tabulardelta import (
     DetailedTextFormatter,
@@ -164,10 +169,12 @@ def get_random_tabulardelta(gen: np.random.Generator):
     )
 
 
+@pytest.mark.pandas
 def test_random_tabulardelta_smoke():
     print(len(get_random_tabulardelta(np.random.default_rng(42)).rows.unequal))
 
 
+@pytest.mark.pandas
 def test_detailed_text_formatter_smoke(sample_size: int = 100):
     for idx in range(sample_size):
         delta = get_random_tabulardelta(np.random.default_rng(idx))
@@ -181,6 +188,7 @@ def test_detailed_text_formatter_smoke(sample_size: int = 100):
             print(f"Completed {idx}/{sample_size}")
 
 
+@pytest.mark.pandas
 def test_row_formatter_smoke(sample_size: int = 10):
     for idx in range(sample_size):
         gen = np.random.default_rng(idx)

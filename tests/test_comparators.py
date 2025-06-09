@@ -2,10 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-QuantCo
 from typing import Any, NamedTuple
 
-import numpy as np
-import pandas as pd
 import pytest
-from pandas.testing import assert_frame_equal
 
 from tabulardelta import (
     DetailedTextFormatter,
@@ -17,6 +14,12 @@ from tabulardelta.comparators.tabulardelta_dataclasses import (
     Column,
     ColumnPair,
 )
+
+try:
+    import numpy as np
+    import pandas as pd
+except ImportError:
+    pass
 
 try:
     from tests.mssql_container.cached_mssql_container import mssql_engine
@@ -99,6 +102,217 @@ def new_df():
     return df
 
 
+def old_df_rows():
+    return [
+        {
+            "id": 0,
+            "equal": 0,
+            "paid": "yes",
+            "unnecessary": 0,
+            "name": "A",
+            "measurement": "[0.1, 0.1, 0.1]",
+            "expectation": 0.12,
+        },
+        {
+            "id": 1,
+            "equal": 0,
+            "paid": "no",
+            "unnecessary": 0,
+            "name": "B",
+            "measurement": "[0.2, 0.2, 0.2]",
+            "expectation": 0.24,
+        },
+        {
+            "id": 2,
+            "equal": 0,
+            "paid": "yes",
+            "unnecessary": 0,
+            "name": "C",
+            "measurement": "[0.3, 0.3, 0.3]",
+            "expectation": 0.36,
+        },
+        {
+            "id": 3,
+            "equal": 0,
+            "paid": "maybe",
+            "unnecessary": 0,
+            "name": "D",
+            "measurement": "[0.4, 0.4, 0.4]",
+            "expectation": 0.48,
+        },
+        {
+            "id": 4,
+            "equal": 0,
+            "paid": "yes",
+            "unnecessary": 0,
+            "name": "E",
+            "measurement": "[0.5, 0.5, 0.5]",
+            "expectation": 0.5,
+        },
+        {
+            "id": 5,
+            "equal": 0,
+            "paid": "no",
+            "unnecessary": 0,
+            "name": "F",
+            "measurement": "[0.6, 0.6, 0.6]",
+            "expectation": 0.68,
+        },
+        {
+            "id": 6,
+            "equal": 0,
+            "paid": "yes",
+            "unnecessary": 0,
+            "name": "G",
+            "measurement": "[0.7, 0.7, 0.7]",
+            "expectation": 0.76,
+        },
+        {
+            "id": 7,
+            "equal": 0,
+            "paid": "no",
+            "unnecessary": 0,
+            "name": "H",
+            "measurement": "[0.8, 0.8, 0.8]",
+            "expectation": 0.84,
+        },
+        {
+            "id": 8,
+            "equal": 0,
+            "paid": "yes",
+            "unnecessary": 0,
+            "name": "I",
+            "measurement": "[0.9, 0.9, 0.9]",
+            "expectation": 0.92,
+        },
+        {
+            "id": 9,
+            "equal": 0,
+            "paid": "no",
+            "unnecessary": 0,
+            "name": "J",
+            "measurement": "[1.0, 1.0, 1.0]",
+            "expectation": 1.0,
+        },
+    ]
+
+
+def new_df_rows():
+    return [
+        {
+            "id": 1.0,
+            "equal": 0,
+            "paid": False,
+            "name": "B",
+            "renamedmeasurement": "[0.2, 0.2, 0.2]",
+            "expectation": 0.24,
+            "results": 0.2,
+            "second_result": 0.2,
+        },
+        {
+            "id": 0.0,
+            "equal": 0,
+            "paid": True,
+            "name": "A",
+            "renamedmeasurement": "[0.1, 0.1, 0.1]",
+            "expectation": 0.12,
+            "results": 0.1,
+            "second_result": 0.1,
+        },
+        {
+            "id": 2.0,
+            "equal": 0,
+            "paid": True,
+            "name": "C",
+            "renamedmeasurement": "[0.3, 0.3, 0.3]",
+            "expectation": 0.36,
+            "results": 0.3,
+            "second_result": 0.3,
+        },
+        {
+            "id": 3.0,
+            "equal": 0,
+            "paid": False,
+            "name": "D",
+            "renamedmeasurement": "[0.4, 0.4, 0.4]",
+            "expectation": 0.48,
+            "results": 0.4,
+            "second_result": 0.4,
+        },
+        {
+            "id": 4.0,
+            "equal": 0,
+            "paid": True,
+            "name": "E",
+            "renamedmeasurement": "[0.5, 0.5, 0.5]",
+            "expectation": 0.55,
+            "results": 0.5,
+            "second_result": 0.5,
+        },
+        {
+            "id": 5.0,
+            "equal": 0,
+            "paid": False,
+            "name": "F",
+            "renamedmeasurement": "[0.6, 0.6, 0.6]",
+            "expectation": 0.68,
+            "results": 0.6,
+            "second_result": 0.6,
+        },
+        {
+            "id": 6.0,
+            "equal": 0,
+            "paid": True,
+            "name": "G",
+            "renamedmeasurement": "[0.7, 0.7, 0.7]",
+            "expectation": 0.76,
+            "results": 0.7,
+            "second_result": 0.7,
+        },
+        {
+            "id": 7.0,
+            "equal": 0,
+            "paid": False,
+            "name": "H",
+            "renamedmeasurement": "[0.8, 0.8, 0.8]",
+            "expectation": 0.84,
+            "results": 0.8,
+            "second_result": 0.8,
+        },
+        {
+            "id": 8.0,
+            "equal": 0,
+            "paid": True,
+            "name": "I",
+            "renamedmeasurement": "[0.9, 0.9, 0.9]",
+            "expectation": 0.92,
+            "results": 0.9,
+            "second_result": 0.9,
+        },
+        {
+            "id": 9.0,
+            "equal": 0,
+            "paid": False,
+            "name": "Jess",
+            "renamedmeasurement": "[1.0, 1.0, 1.0]",
+            "expectation": 1.0,
+            "results": 1.0,
+            "second_result": 1.0,
+        },
+        {
+            "id": 10.0,
+            "equal": 0,
+            "paid": True,
+            "name": "Karl",
+            "renamedmeasurement": "[1.0, 1.1, 1.2]",
+            "expectation": 0.9,
+            "results": 1.1,
+            "second_result": 1.1,
+        },
+    ]
+
+
+@pytest.mark.pandas
 def test_pandas_comparator():
     delta = PandasComparator(["name"]).compare(old_df(), new_df())
 
@@ -217,17 +431,18 @@ def test_pandas_comparator():
     cols = changes[0].keys()
     assert actual_differences[0].old and actual_differences[0].old.name in cols
     assert actual_differences[0].new and actual_differences[0].new.name in cols
-    expected_df = pd.DataFrame(
+    expected_changes = [
         {
-            "name": ["E"],
-            "expectation_old": [0.5],
-            "expectation": [0.55],
-            "_count": [1],
+            "name": "E",
+            "expectation_old": 0.5,
+            "expectation": 0.55,
+            "_count": 1,
         }
-    )
-    assert_frame_equal(pd.DataFrame(changes), expected_df.reset_index(drop=True))
+    ]
+    rec_approx(changes, expected_changes)
 
 
+@pytest.mark.pandas
 def test_pandas_comparator_row_col_orders():
     test_dfs = [  # (DataFrame, Order <1=RowChanged, 2=ColChanged>)
         (pd.DataFrame({"id": [1, 2], "col": ["a", "b"]}), 0),
@@ -250,12 +465,36 @@ def test_pandas_comparator_row_col_orders():
     "input_type", ["table_str", "schema_table_str", "bracket_table_str", "sa_table"]
 )
 def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
-    first = old_df()
-    first["measurement"] = first["measurement"].apply(str)
-    second = new_df()
-    second["renamedmeasurement"] = second["renamedmeasurement"].apply(str)
-    first.to_sql("first", mssql_engine, index=False, index_label="name", schema="dbo")
-    second.to_sql("second", mssql_engine, index=False, index_label="name", schema="dbo")
+    metadata = sa.MetaData()
+    first_table = sa.Table(
+        "first",
+        metadata,
+        sa.Column("id", sa.BigInteger()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.String()),
+        sa.Column("unnecessary", sa.BigInteger()),
+        sa.Column("name", sa.String()),
+        sa.Column("measurement", sa.String()),
+        sa.Column("expectation", sa.Float()),
+        schema="dbo",
+    )
+    second_table = sa.Table(
+        "second",
+        metadata,
+        sa.Column("id", sa.Float()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.Boolean()),
+        sa.Column("name", sa.String()),
+        sa.Column("renamedmeasurement", sa.String()),
+        sa.Column("expectation", sa.Float(24)),
+        sa.Column("results", sa.Float()),
+        sa.Column("second_result", sa.Float(24)),
+        schema="dbo",
+    )
+    metadata.create_all(mssql_engine)
+    with mssql_engine.begin() as conn:
+        conn.execute(sa.insert(first_table), old_df_rows())
+        conn.execute(sa.insert(second_table), new_df_rows())
 
     old: str | sa.Table
     new: str | sa.Table
@@ -350,7 +589,7 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
             "id": 9.0,
             "equal": 0.0,
             "name": "Jess",
-            "renamedmeasurement": "[np.float64(1.0), np.float64(1.0), np.float64(1.0)]",
+            "renamedmeasurement": "[1.0, 1.0, 1.0]",
             "expectation": 1.0,
         },
     )
@@ -371,7 +610,7 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
                 "id": 9.0,
                 "equal": 0.0,
                 "name": "J",
-                "measurement": "[np.float64(1.0), np.float64(1.0), np.float64(1.0)]",
+                "measurement": "[1.0, 1.0, 1.0]",
                 "expectation": 1.0,
             }
         ],
@@ -387,17 +626,15 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
     assert len(diff_values) > 0
     assert actual_differences[0].old.name in diff_values[0].keys()
     assert actual_differences[0].new.name in diff_values[0].keys()
-    expected = pd.DataFrame(
+    expected_diff = [
         {
-            "expectation": [0.55],
-            "expectation_old": [0.5],
-            "_count": [1],
-            "name": ["E"],
+            "expectation": 0.55,
+            "expectation_old": 0.5,
+            "_count": 1,
+            "name": "E",
         }
-    )
-    assert_frame_equal(
-        pd.DataFrame(diff_values), expected.reset_index(drop=True), check_dtype=False
-    )
+    ]
+    rec_approx(diff_values, expected_diff)
 
 
 @pytest.mark.sql
@@ -405,12 +642,36 @@ def test_sqlcompyre_comparator(mssql_engine: sa.Engine, input_type: str):
     "input_type", ["table_str", "schema_table_str", "bracket_table_str", "sa_table"]
 )
 def test_sqlmetadata_comparator(mssql_engine: sa.Engine, input_type: str):
-    first = old_df()
-    first["measurement"] = first["measurement"].apply(str)
-    second = new_df()
-    second["renamedmeasurement"] = second["renamedmeasurement"].apply(str)
-    first.to_sql("first", mssql_engine, index=False, index_label="name")
-    second.to_sql("second", mssql_engine, index=False, index_label="name")
+    metadata = sa.MetaData()
+    first_table = sa.Table(
+        "first",
+        metadata,
+        sa.Column("id", sa.BigInteger()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.String()),
+        sa.Column("unnecessary", sa.BigInteger()),
+        sa.Column("name", sa.String()),
+        sa.Column("measurement", sa.String()),
+        sa.Column("expectation", sa.Float()),
+        schema="dbo",
+    )
+    second_table = sa.Table(
+        "second",
+        metadata,
+        sa.Column("id", sa.Float()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.Boolean()),
+        sa.Column("name", sa.String()),
+        sa.Column("renamedmeasurement", sa.String()),
+        sa.Column("expectation", sa.Float(24)),
+        sa.Column("results", sa.Float()),
+        sa.Column("second_result", sa.Float(24)),
+        schema="dbo",
+    )
+    metadata.create_all(mssql_engine)
+    with mssql_engine.begin() as conn:
+        conn.execute(sa.insert(first_table), old_df_rows())
+        conn.execute(sa.insert(second_table), new_df_rows())
 
     old: str | sa.Table
     new: str | sa.Table
@@ -468,22 +729,75 @@ def test_sqlmetadata_comparator(mssql_engine: sa.Engine, input_type: str):
 
 @pytest.mark.sql
 def test_sqlmetadata_comparator_cache(mssql_engine: sa.Engine):
-    first = old_df()
-    second = new_df()
-    first.to_sql("first", mssql_engine, index=False, index_label="name")
-    second.to_sql("second", mssql_engine, index=False, index_label="name")
+    metadata = sa.MetaData()
+    first_table = sa.Table(
+        "first",
+        metadata,
+        sa.Column("id", sa.BigInteger()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.String()),
+        sa.Column("unnecessary", sa.BigInteger()),
+        sa.Column("name", sa.String()),
+        sa.Column("measurement", sa.String()),
+        sa.Column("expectation", sa.Float()),
+        schema="dbo",
+    )
+    second_table = sa.Table(
+        "second",
+        metadata,
+        sa.Column("id", sa.Float()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.Boolean()),
+        sa.Column("name", sa.String()),
+        sa.Column("renamedmeasurement", sa.String()),
+        sa.Column("expectation", sa.Float(24)),
+        sa.Column("results", sa.Float()),
+        sa.Column("second_result", sa.Float(24)),
+        schema="dbo",
+    )
+    metadata.create_all(mssql_engine)
+    with mssql_engine.begin() as conn:
+        conn.execute(sa.insert(first_table), old_df_rows())
+        conn.execute(sa.insert(second_table), new_df_rows())
 
     # Create a comparison with activated caching
     cache_comp = SqlMetadataComparator(mssql_engine, cache_db_metadata=True)
     original_delta = cache_comp.compare("first", "second")
 
     # Change (switch) the tables in the database
-    second.to_sql(
-        "first", mssql_engine, index=False, index_label="id", if_exists="replace"
+    first_table.drop(bind=mssql_engine, checkfirst=True)
+    second_table.drop(bind=mssql_engine, checkfirst=True)
+    first_renamed_table = sa.Table(
+        "second",
+        metadata,
+        sa.Column("id", sa.BigInteger()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.String()),
+        sa.Column("unnecessary", sa.BigInteger()),
+        sa.Column("name", sa.String()),
+        sa.Column("measurement", sa.String()),
+        sa.Column("expectation", sa.Float()),
+        schema="dbo",
+        extend_existing=True,
     )
-    first.to_sql(
-        "second", mssql_engine, index=False, index_label="id", if_exists="replace"
+    second_renamed_table = sa.Table(
+        "first",
+        metadata,
+        sa.Column("id", sa.Float()),
+        sa.Column("equal", sa.Integer()),
+        sa.Column("paid", sa.Boolean()),
+        sa.Column("name", sa.String()),
+        sa.Column("renamedmeasurement", sa.String()),
+        sa.Column("expectation", sa.Float(24)),
+        sa.Column("results", sa.Float()),
+        sa.Column("second_result", sa.Float(24)),
+        schema="dbo",
+        extend_existing=True,
     )
+    metadata.create_all(mssql_engine)
+    with mssql_engine.begin() as conn:
+        conn.execute(sa.insert(first_renamed_table), old_df_rows())
+        conn.execute(sa.insert(second_renamed_table), new_df_rows())
 
     # New comparison should be different
     changed_delta = SqlMetadataComparator(mssql_engine).compare("first", "second")
