@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-import pandas as pd
 import polars as pl
 import pytest
 import sqlalchemy
@@ -20,6 +19,12 @@ from pydiverse.pipedag import (  # type: ignore
 )
 from pydiverse.pipedag.core.config import create_basic_pipedag_config  # type: ignore
 from pydiverse.pipedag.util.structlog import setup_logging  # type: ignore
+
+try:
+    import pandas as pd
+except ImportError:
+    pass
+
 
 from tabulardelta import (
     DetailedTextFormatter,
@@ -48,6 +53,7 @@ except ImportError:
         return "SqlAlchemy or pyodbc not installed."
 
 
+@pytest.mark.pandas
 def test_df_example():
     df_old = df_new = pd.DataFrame()
     # df_old, df_new = ...
@@ -56,6 +62,7 @@ def test_df_example():
     print(DetailedTextFormatter().format(delta))
 
 
+@pytest.mark.pandas
 def test_csv_example():
     assets_path = Path(__file__).parent / "test_assets"
 
@@ -67,6 +74,7 @@ def test_csv_example():
 
 
 @pytest.mark.sql
+@pytest.mark.pandas
 def test_sql_cli_example(mssql_engine: sqlalchemy.Engine):
     @click.command()
     @click.argument("old_table")
@@ -228,6 +236,7 @@ def validate_stage(
 
 
 @pytest.mark.sql
+@pytest.mark.pandas
 def test_pipedag_example():
     url = cached_clean_mssql_container().sqlalchemy_url()
     cfg = create_basic_pipedag_config(url).get("default")
@@ -260,6 +269,7 @@ class PolarsComparator:
         return comparator.compare(left.to_pandas(), right.to_pandas())
 
 
+@pytest.mark.pandas
 def test_polars_comparator():
     expected = pl.DataFrame({"id": [1, 2, 3]})
     observed = pl.DataFrame({"id": [1, 2, 3, 4], "data_column": [1, 2, 3, 4]})
@@ -316,6 +326,7 @@ class AssertingFormatter:
             raise AssertionError("\n - ".join(flat_changes))
 
 
+@pytest.mark.pandas
 def test_example():
     expected = pd.DataFrame({"id": [1, 2, 3]})
     # observed = ...

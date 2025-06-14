@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 import sqlalchemy as sa
 
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.native_dataclasses import (
     Column,
     ColumnPair,
     TabularDelta,

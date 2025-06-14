@@ -354,7 +354,7 @@ For more details, please have a look at the API reference:
 
    TabularDelta Protocol <api/tabulardelta.tabulardelta>
 
-Comparators using TabularDelta_Dataclasses
+Comparators
 ----------------------------------------------
 
 Comparators can compare two (tabular) data sources and return an object which adheres to the TabularDelta protocol:
@@ -367,9 +367,10 @@ Comparators can compare two (tabular) data sources and return an object which ad
         def compare(self, old: T, new: T) -> TabularDelta: ...
 
 
-All current comparators rely on
-:doc:`tabulardelta_dataclasses.py<api/tabulardelta.comparators.tabulardelta_dataclasses>`
-which implements the TabularDelta protocol using dataclasses.
+SQL-based comparators rely on
+:doc:`tabulardelta_dataclasses.py<api/tabulardelta.comparators.native_dataclasses>`
+while the PandasComparator uses a pandas-specific :doc:`tabulardelta_dataclasses.py<api/tabulardelta.comparators.pandas_dataclasses>`,
+both of which implement the TabularDelta protocol.
 
 These currently implemented Comparators are:
 

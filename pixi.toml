@@ -9,8 +9,6 @@ postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-
 
 [dependencies]
 python = ">=3.11"
-numpy = ">=1.24.4,<3"
-pandas = ">=2.0.3,<3"
 
 [host-dependencies]
 pip = "*"
@@ -71,9 +69,14 @@ sqlalchemy = "*"
 sqlcompyre = "*"
 pyodbc = "*"
 
+[feature.pandas.dependencies]
+numpy = ">=1.24.4,<3"
+pandas = ">=2.0.3,<3"
+
 [environments]
-no-sql = ["test"]
-default = ["test", "sql"]
+default = ["test", "pandas", "sql"]
+no-sql = ["test", "pandas"]
+no-pandas = ["test", "sql"]
 py311 = ["py311", "test", "sql"]
 py312 = ["py312", "test", "sql"]
 docs = ["docs", "sql"]

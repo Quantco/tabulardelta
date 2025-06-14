@@ -31,6 +31,7 @@ jobs:
           - py311
           - py312
           - no-sql
+          - no-pandas
         os:
           - ubuntu-22.04
           - windows-latest
@@ -55,4 +56,4 @@ jobs:
       - name: Install repository
         run: pixi run -e ${{ matrix.environment }} postinstall
       - name: Run pytest
-        run: pixi run -e ${{ matrix.environment }} test-coverage --color=yes ${{ matrix.environment=='no-sql' && '-m "not sql"' || ''}}
+        run: pixi run -e ${{ matrix.environment }} test-coverage --color=yes -m ${{ matrix.environment=='no-sql' && '"not sql"' || (matrix.environment=='no-pandas' && '"not pandas"' || '""')}}

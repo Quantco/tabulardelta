@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.pandas_dataclasses import (
     ColumnPair,
     TabularDelta,
 )

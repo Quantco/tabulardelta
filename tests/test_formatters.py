@@ -5,18 +5,23 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-import numpy as np
-import pandas as pd
-from numpy import (
-    dtype,
-    ndarray,
-)
+import pytest
+
+try:
+    import numpy as np
+    import pandas as pd
+    from numpy import (
+        dtype,
+        ndarray,
+    )
+except ImportError:
+    pass
 
 from tabulardelta import (
     DetailedTextFormatter,
     OverviewRowFormatter,
 )
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.native_dataclasses import (
     Column,
     ColumnPair,
     TabularDelta,
@@ -60,25 +65,29 @@ def get_random_tabulardelta(gen: np.random.Generator):
     ) -> ColumnPair:
         if chg.old is None or chg.new is None:
             raise ValueError("Can't generate values for non-matched columns.")
-        size = cast(int, gen.integers(0, 2 ** gen.integers(0, 10)))
+        size = gen.integers(0, 2 ** gen.integers(0, 10))
         old_renamed = Column(
             chg.old.name + ("_old" if chg.old.name == chg.new.name else ""),
             chg.old.type,
         )
-        indexes = {col.name: gen_col_values(col.type, size) for col in join_columns}
+        indexes = {
+            col.name: gen_col_values(col.type, cast(int, size)) for col in join_columns
+        }
         df = pd.DataFrame(
             {
-                old_renamed.name: gen_col_values(chg.old.type, size),
-                chg.new.name: gen_col_values(chg.new.type, size),
+                old_renamed.name: gen_col_values(chg.old.type, cast(int, size)),
+                chg.new.name: gen_col_values(chg.new.type, cast(int, size)),
                 **indexes,
-                "_count": gen_col_values("uint64", size).astype("int"),
+                "_count": gen_col_values("uint64", cast(int, size)).astype("int"),
             }
         )
         if gen.random() < 0.5:
             additional = gen.integers(0, 10 ** gen.integers(0, 8))
             df.loc[len(df)] = [None] * (2 + len(join_columns)) + [additional]
             df["_count"] = df["_count"].astype("int")
-        return ColumnPair(chg.old, chg.new, incomparable=incomparable, _values=df)
+        return ColumnPair(
+            chg.old, chg.new, incomparable=incomparable, _values=df.to_dict("records")
+        )
 
     def gen_change() -> ColumnPair:
         old = gen_col_meta()
@@ -160,10 +169,12 @@ def get_random_tabulardelta(gen: np.random.Generator):
     )
 
 
+@pytest.mark.pandas
 def test_random_tabulardelta_smoke():
     print(len(get_random_tabulardelta(np.random.default_rng(42)).rows.unequal))
 
 
+@pytest.mark.pandas
 def test_detailed_text_formatter_smoke(sample_size: int = 100):
     for idx in range(sample_size):
         delta = get_random_tabulardelta(np.random.default_rng(idx))
@@ -177,6 +188,7 @@ def test_detailed_text_formatter_smoke(sample_size: int = 100):
             print(f"Completed {idx}/{sample_size}")
 
 
+@pytest.mark.pandas
 def test_row_formatter_smoke(sample_size: int = 10):
     for idx in range(sample_size):
         gen = np.random.default_rng(idx)
