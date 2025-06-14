@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.pandas_dataclasses import (
     ColumnPair,
     TabularDelta,
 )
@@ -154,7 +154,7 @@ def _value_change(
     diff.rename(columns={col + suffixes[1]: col}, inplace=True)
     diff["_count"] = 1
     combined = col, old_dt[col], col, new_dt[col], False
-    return ColumnPair.from_str(*combined, incomparable, diff.to_dict("records"))
+    return ColumnPair.from_str(*combined, incomparable, diff)
 
 
 def compare_pandas(

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 import sqlcompyre as sc
 from sqlcompyre.analysis import TableComparison
 
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.native_dataclasses import (
     ColumnPair,
     TabularDelta,
 )

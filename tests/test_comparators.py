@@ -3,14 +3,16 @@
 from typing import Any, NamedTuple
 
 import pytest
+from pandas.testing import assert_frame_equal
 
+import tabulardelta.comparators.pandas_dataclasses as pd_dc
 from tabulardelta import (
     DetailedTextFormatter,
     PandasComparator,
     SqlCompyreComparator,
     SqlMetadataComparator,
 )
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.native_dataclasses import (
     Column,
     ColumnPair,
 )
@@ -321,23 +323,25 @@ def test_pandas_comparator():
     assert delta.warnings == []
     assert delta.errors == []
     assert delta.cols.joined == [
-        ColumnPair(Column("name", "object"), Column("name", "object"), join=True)
+        pd_dc.ColumnPair(
+            pd_dc.Column("name", "object"), pd_dc.Column("name", "object"), join=True
+        )
     ]
-    assert delta.cols.removed == [Column("unnecessary", "int64")]
+    assert delta.cols.removed == [pd_dc.Column("unnecessary", "int64")]
     assert set(delta.cols.added) == {
-        Column("results", "float64"),
-        Column("second_result", "float32"),
+        pd_dc.Column("results", "float64"),
+        pd_dc.Column("second_result", "float32"),
     }
     assert delta.cols.renamed == [
-        ColumnPair(
-            Column("measurement", "object"),
-            Column("renamedmeasurement", "object"),
+        pd_dc.ColumnPair(
+            pd_dc.Column("measurement", "object"),
+            pd_dc.Column("renamedmeasurement", "object"),
         )
     ]
     comparable = [chg for chg in delta.cols.comparable_type_changed]
     assert len(comparable) == 1
-    assert comparable[0].old == Column("expectation", "float64")
-    assert comparable[0].new == Column("expectation", "float32")
+    assert comparable[0].old == pd_dc.Column("expectation", "float64")
+    assert comparable[0].new == pd_dc.Column("expectation", "float32")
     assert all(chg.old and chg.new for chg in delta.cols.incomparable_type_changed)
     incomparable_dtype_dict = {
         chg.new.name: (
@@ -354,9 +358,8 @@ def test_pandas_comparator():
     assert "paid" in incomparable_dtype_dict
     assert incomparable_dtype_dict["paid"][2] == "object"
     assert incomparable_dtype_dict["paid"][3] == "bool"
-    assert incomparable_dtype_dict["paid"][4] is not None
-    assert len(incomparable_dtype_dict["paid"][4]) > 0
-    cols = incomparable_dtype_dict["paid"][4][0].keys()
+    assert isinstance(incomparable_dtype_dict["paid"][4], pd.DataFrame)
+    cols = incomparable_dtype_dict["paid"][4].columns
     assert "name" in cols
     assert "_count" in cols
     assert incomparable_dtype_dict["paid"][0] in cols
@@ -365,13 +368,12 @@ def test_pandas_comparator():
     assert "id" in incomparable_dtype_dict
     assert incomparable_dtype_dict["id"][2] == "int64"
     assert incomparable_dtype_dict["id"][3] == "float64"
-    assert incomparable_dtype_dict["id"][4] is not None
-    assert len(incomparable_dtype_dict["id"][4]) > 0
-    cols = incomparable_dtype_dict["id"][4][0].keys()
+    assert isinstance(incomparable_dtype_dict["id"][4], pd.DataFrame)
+    cols = incomparable_dtype_dict["id"][4].columns
     assert "name" in cols
     assert "_count" in cols
-    assert incomparable_dtype_dict["id"][0] in cols
-    assert incomparable_dtype_dict["id"][1] in cols
+    assert incomparable_dtype_dict["id"][0] in incomparable_dtype_dict["id"][4].columns
+    assert incomparable_dtype_dict["id"][1] in incomparable_dtype_dict["id"][4].columns
 
     assert len(delta.rows.old) == 10
     assert len(delta.rows.new) == 11
@@ -425,21 +427,19 @@ def test_pandas_comparator():
     actual_differences = [diff for diff in delta.cols.differences if len(diff) > 0]
     assert len(actual_differences) == 1
     assert actual_differences[0].new and actual_differences[0].new.name == "expectation"
-    changes = actual_differences[0]._values
-    assert changes is not None
-    assert len(changes) > 0
-    cols = changes[0].keys()
-    assert actual_differences[0].old and actual_differences[0].old.name in cols
-    assert actual_differences[0].new and actual_differences[0].new.name in cols
-    expected_changes = [
+    df = actual_differences[0]._values
+    assert df is not None
+    assert actual_differences[0].old and actual_differences[0].old.name in df.columns
+    assert actual_differences[0].new and actual_differences[0].new.name in df.columns
+    expected_df = pd.DataFrame(
         {
-            "name": "E",
-            "expectation_old": 0.5,
-            "expectation": 0.55,
-            "_count": 1,
+            "expectation_old": [0.5],
+            "expectation": [0.55],
+            "_count": [1],
+            "name": ["E"],
         }
-    ]
-    rec_approx(changes, expected_changes)
+    )
+    assert_frame_equal(df.reset_index(drop=True), expected_df.reset_index(drop=True))
 
 
 @pytest.mark.pandas

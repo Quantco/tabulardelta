@@ -21,7 +21,7 @@ from tabulardelta import (
     DetailedTextFormatter,
     OverviewRowFormatter,
 )
-from tabulardelta.comparators.tabulardelta_dataclasses import (
+from tabulardelta.comparators.native_dataclasses import (
     Column,
     ColumnPair,
     TabularDelta,
