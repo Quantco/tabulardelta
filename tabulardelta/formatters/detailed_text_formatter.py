@@ -199,7 +199,13 @@ def _show_values(chg: ChangedColumn, max_height=10, header: bool = False) -> Cel
             result.append(["", "", old, "→", new] + [f"example_{i}" for i in indices])
         if idx == max_height - 1 and total > row.count:
             break  # max_height will not suffice to print all changes
-        content = ["    ", f"({row.count}x)" * (row.count > 1), row.old, "→", row.new]
+        content = [
+            "    ",
+            f"({row.count}x)" * int(row.count > 1),
+            row.old,
+            "→",
+            row.new,
+        ]
         result.append(content + [row.example_join_columns[ex] for ex in indices])
         total -= row.count
     if total > 0:

@@ -462,7 +462,7 @@ This will output the following tables:
 
 The currently available formatters, which both use TabularText, are:
 
-**DetailedTextFormatter**: The goal of this formatter is to get as many details about a single comparison without loosing the overview.
+**DetailedTextFormatter**: The goal of this formatter is to get as many details about a single comparison without losing the overview.
 
 **OverviewRowFormatter**: This formatter is stateful, and collects comparisons as rows.
 Calling `table()` will combine all comparisons into a single table.
