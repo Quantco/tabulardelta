@@ -67,7 +67,7 @@ python = "3.11.*"
 python = "3.12.*"
 
 [feature.sql.dependencies]
-sqlalchemy = "*"
+sqlalchemy = ">=2.0.0"
 sqlcompyre = "*"
 pyodbc = "*"
 
