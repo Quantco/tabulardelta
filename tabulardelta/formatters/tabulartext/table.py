@@ -334,7 +334,7 @@ class Table:
                         result[current_row + y_pos][current_col] = line
 
         self._traverse(collect_result)
-        return ["".join(row) for row in result]
+        return ["".join(row).rstrip() for row in result]
 
     def to_string(self, add_border: bool = True) -> str:
         """Returns rendered table as string by concatenating :meth:`lines`.

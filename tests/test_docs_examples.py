@@ -109,42 +109,44 @@ def test_sql_cli_example(mssql_engine: sqlalchemy.Engine):
         compare_sql,
         ["archive.registration", "master.registration", "activity", "valid_from"],
     )
-    assert result.stdout == (
-        "---------------------- TabularDelta Report: registration -> registration ----------------------\n"
-        + "                                                                                               \n"
-        + "Joined on ['activity', 'valid_from'].                                                          \n"
-        + "                                                                                               \n"
-        + "Added columns:                                                                                 \n"
-        + "┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                                                   \n"
-        + "┃free_days_until_registered┃                                                                   \n"
-        + "┃(BIGINT)                  ┃                                                                   \n"
-        + "┣━━━━━━━━━━━━━━━━━━━━━━━━━━┫                                                                   \n"
-        + "                                                                                               \n"
-        + "Renamed columns:                                                                               \n"
-        + "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                                             \n"
-        + "┃registration → registration_date┃                                                             \n"
-        + "┃(DATETIME)                      ┃                                                             \n"
-        + "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫                                                             \n"
-        + "                                                                                               \n"
-        + "   Old         New                                                                             \n"
-        + "   769         780                                                                             \n"
-        + "┏━┯━┯━┯━┓╌╌╌┏━┯━┯━┯━┓----------------╶╮                                                        \n"
-        + "┃ │ │ │ ┃ = ┃ │ │ │ ┃  757 identical  │ 769                                                    \n"
-        + "┠─┼─┼─┼─┨╌╌╌┠─┼─┼─┼─┨---------------- ├╴rows                                                   \n"
-        + "┃ │ │ │ ┃ ≠ ┃ │ │ │ ┃  12 changed     │ joined                                                 \n"
-        + "┗━┷━┷━┷━┛╌╌╌┠─┼─┼─┼─┨----------------╶╯                                                        \n"
-        + "            ┃+│+│+│+┃  11 added                                                                \n"
-        + "            ┗━┷━┷━┷━┛                                                                          \n"
-        + "                                                                                               \n"
-        + "Column valid_until - 12 rows changed:                                                          \n"
-        + "             valid_until          →  valid_until          example_activity  example_valid_from \n"
-        + "      (12x)  9999-12-31 00:00:00  →  2024-06-28 00:00:00  123               2000-01-01 00:00:00\n"
-        + "                                                                                               \n"
-        + "ADDED ROWS EXAMPLES:                                                                           \n"
-        + "activity│valid_from         │registration_date  │valid_until                                   \n"
-        + "892     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00                           \n"
-        + "893     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00                           \n"
-        + "894     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00                           \n"
+    assert (
+        result.stdout
+        == """---------------------- TabularDelta Report: registration -> registration ----------------------
+
+Joined on ['activity', 'valid_from'].
+
+Added columns:
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃free_days_until_registered┃
+┃(BIGINT)                  ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+
+Renamed columns:
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃registration → registration_date┃
+┃(DATETIME)                      ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+
+   Old         New
+   769         780
+┏━┯━┯━┯━┓╌╌╌┏━┯━┯━┯━┓----------------╶╮
+┃ │ │ │ ┃ = ┃ │ │ │ ┃  757 identical  │ 769
+┠─┼─┼─┼─┨╌╌╌┠─┼─┼─┼─┨---------------- ├╴rows
+┃ │ │ │ ┃ ≠ ┃ │ │ │ ┃  12 changed     │ joined
+┗━┷━┷━┷━┛╌╌╌┠─┼─┼─┼─┨----------------╶╯
+            ┃+│+│+│+┃  11 added
+            ┗━┷━┷━┷━┛
+
+Column valid_until - 12 rows changed:
+             valid_until          →  valid_until          example_activity  example_valid_from
+      (12x)  9999-12-31 00:00:00  →  2024-06-28 00:00:00  123               2000-01-01 00:00:00
+
+ADDED ROWS EXAMPLES:
+activity│valid_from         │registration_date  │valid_until
+892     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00
+893     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00
+894     │2000-01-01 00:00:00│2024-07-18 00:00:00│9999-12-31 00:00:00
+"""
     )
 
 
@@ -290,10 +292,10 @@ def test_tabular_text():
         + "┗━━━━━━━━━━━━━━┷━━━━┷━━━━━━━━━━━┛"
     )
     assert Table.from_lists([row1, row2], inner_border).to_string() == (
-        "Just | first | row | Two  |            \n"
+        "Just | first | row | Two  |\n"
         + "---- + ----- + --- + Rows + -----------\n"
         + "Second             |      | BottomRight\n"
-        + "Row                |      |            "
+        + "Row                |      |"
     )
 
 
