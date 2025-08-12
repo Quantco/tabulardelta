@@ -180,11 +180,13 @@ def _str_diff(left: list[str], right: list[str], max_lines=10):
         ls = left[l1:l2]
         rs = right[r1:r2]
         if tag == "equal" and len(ls) == 1:
+            # Keep equal individual lines
             out.append((f" {ls[0]}", f" {rs[0]}"))
         elif tag == "equal":
             # Abbreviate equal multi-line parts
             out.append(("[...]", "[...]"))
         else:
+            # Append -removed_line to the left or +added_line to the right
             for lzip, rzip in zip_longest(ls, rs, fillvalue=None):
                 lzip = "" if lzip is None else f"-{lzip}"
                 rzip = "" if rzip is None else f"+{rzip}"
