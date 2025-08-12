@@ -4,8 +4,10 @@ from typing import Any, NamedTuple
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 from pandas.testing import assert_frame_equal
+from polars.testing import assert_frame_equal as assert_frame_equal_pl
 
 from tabulardelta import (
     DetailedTextFormatter,
@@ -13,6 +15,7 @@ from tabulardelta import (
     SqlCompyreComparator,
     SqlMetadataComparator,
 )
+from tabulardelta.comparators.polars_comparator import PolarsComparator
 from tabulardelta.comparators.tabulardelta_dataclasses import (
     Column,
     ColumnPair,
@@ -486,3 +489,209 @@ def test_sqlmetadata_comparator_cache(mssql_engine: sa.Engine):
     # Cached comparison should be equal to original
     cached_delta = cache_comp.compare("first", "second")
     assert cached_delta == original_delta
+
+
+def old_pl_df():
+    """
+    Polars equivalent of old_df()
+    """
+    return pl.DataFrame(
+        {
+            "id": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            "equal": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "paid": [
+                "yes",
+                "no",
+                "yes",
+                "maybe",
+                "yes",
+                "no",
+                "yes",
+                "no",
+                "yes",
+                "no",
+            ],
+            "unnecessary": [0] * 10,
+            "name": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+            "measurement": [[val] * 3 for val in np.arange(0.1, 1.1, 0.1)],
+            "expectation": [0.12, 0.24, 0.36, 0.48, 0.5, 0.68, 0.76, 0.84, 0.92, 1.0],
+        }
+    )
+
+
+def new_pl_df():
+    """
+    Polars equivalent of new_df()
+    """
+    df = (
+        old_pl_df()
+        .with_columns(
+            paid=pl.when(pl.col("paid") == "yes").then(True).otherwise(False),
+            renamedmeasurement=pl.col("measurement"),
+            results=pl.col("measurement").list.sum() / pl.col("measurement").list.len(),
+            expectation=pl.col("expectation").cast(pl.Float32),
+            id=pl.col("id").cast(pl.Float64),
+            second_result=(
+                pl.col("measurement").list.sum() / pl.col("measurement").list.len()
+            ).cast(pl.Float32),
+        )
+        .drop(["unnecessary", "measurement"])
+    )
+
+    row_0 = df[0]
+    row_1 = df[1]
+    df = pl.concat([row_1, row_0, df[2:]])
+    df[9, "name"] = "Jess"
+    df[4, "expectation"] = 0.55
+
+    df = pl.concat(
+        [
+            df,
+            pl.DataFrame(
+                {
+                    "id": 10.0,
+                    "equal": 0,
+                    "paid": True,
+                    "name": "Karl",
+                    "expectation": 0.9,
+                    "renamedmeasurement": [[1.0, 1.1, 1.2]],
+                    "results": 1.1,
+                    "second_result": 1.1,
+                }
+            ).cast(
+                {
+                    "equal": pl.Int64,
+                    "expectation": pl.Float32,
+                    "second_result": pl.Float32,
+                    "id": pl.Float64,
+                }
+            ),
+        ]
+    )
+    return df
+
+
+def test_polars_comparator():
+    delta = PolarsComparator(["name"]).compare(old_pl_df(), new_pl_df())
+
+    print(delta)
+
+    assert delta.warnings == []
+    assert delta.errors == []
+    assert delta.cols.joined == [
+        ColumnPair(Column("name", "String"), Column("name", "String"), join=True)
+    ]
+    assert delta.cols.removed == [Column("unnecessary", "Int64")]
+    assert set(delta.cols.added) == {
+        Column("results", "Float64"),
+        Column("second_result", "Float32"),
+    }
+    assert delta.cols.renamed == [
+        ColumnPair(
+            Column("measurement", "List(Float64)"),
+            Column("renamedmeasurement", "List(Float64)"),
+        )
+    ]
+    comparable = [chg for chg in delta.cols.comparable_type_changed]
+    assert len(comparable) == 1
+    assert comparable[0].old == Column("expectation", "Float64")
+    assert comparable[0].new == Column("expectation", "Float32")
+    assert all(chg.old and chg.new for chg in delta.cols.incomparable_type_changed)
+    incomparable_dtype_dict = {
+        chg.new.name: (
+            chg.old.name,
+            chg.new.name,
+            chg.old.type,
+            chg.new.type,
+            chg._values,
+        )
+        for chg in delta.cols.incomparable_type_changed
+        if chg.old and chg.new
+    }
+
+    assert "paid" in incomparable_dtype_dict
+    assert incomparable_dtype_dict["paid"][2] == "String"
+    assert incomparable_dtype_dict["paid"][3] == "Boolean"
+    assert isinstance(incomparable_dtype_dict["paid"][4], pl.DataFrame)
+    cols = incomparable_dtype_dict["paid"][4].columns
+    assert "name" in cols
+    assert "_count" in cols
+    assert incomparable_dtype_dict["paid"][0] in cols
+    assert incomparable_dtype_dict["paid"][1] in cols
+
+    assert "id" in incomparable_dtype_dict
+    assert incomparable_dtype_dict["id"][2] == "Int64"
+    assert incomparable_dtype_dict["id"][3] == "Float64"
+    assert isinstance(incomparable_dtype_dict["id"][4], pl.DataFrame)
+    cols = incomparable_dtype_dict["id"][4].columns
+    assert "name" in cols
+    assert "_count" in cols
+    assert incomparable_dtype_dict["id"][0] in incomparable_dtype_dict["id"][4].columns
+    assert incomparable_dtype_dict["id"][1] in incomparable_dtype_dict["id"][4].columns
+
+    assert len(delta.rows.old) == 10
+    assert len(delta.rows.new) == 11
+    assert len(delta.rows.equal) == 8
+    assert len(delta.rows.removed) == 1
+    assert len(delta.rows.added) == 2
+    assert len(delta.rows.unequal) == 1
+
+    added = {row["id"]: row for row in delta.rows.added}
+    rec_approx(
+        added[9.0],
+        {
+            "id": 9.0,
+            "equal": 0.0,
+            "paid": False,
+            "name": "Jess",
+            "renamedmeasurement": [1.0, 1.0, 1.0],
+            "expectation": 1.0,
+            "results": 1.0,
+            "second_result": 1.0,
+        },
+    )
+    rec_approx(
+        added[10.0],
+        {
+            "id": 10.0,
+            "equal": 0.0,
+            "paid": True,
+            "name": "Karl",
+            "renamedmeasurement": [1.0, 1.1, 1.2],
+            "expectation": 0.9,
+            "results": 1.1,
+            "second_result": 1.1,
+        },
+    )
+    rec_approx(
+        list(delta.rows.removed),
+        [
+            {
+                "id": 9.0,
+                "equal": 0.0,
+                "paid": "no",
+                "unnecessary": 0.0,
+                "name": "J",
+                "measurement": [1.0, 1.0, 1.0],
+                "expectation": 1.0,
+            }
+        ],
+    )
+
+    actual_differences = [diff for diff in delta.cols.differences if len(diff) > 0]
+    assert len(actual_differences) == 1
+    assert actual_differences[0].new and actual_differences[0].new.name == "expectation"
+    df = actual_differences[0]._values
+    assert df is not None
+    assert actual_differences[0].old and actual_differences[0].old.name in df.columns
+    assert actual_differences[0].new and actual_differences[0].new.name in df.columns
+    expected_df = pl.DataFrame(
+        {
+            "expectation_old": [0.5],
+            "expectation": [0.55],
+            "_count": [1],
+            "name": ["E"],
+        }
+    )
+
+    assert_frame_equal_pl(df, expected_df)
