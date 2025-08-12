@@ -12,9 +12,11 @@ from numpy import (
     ndarray,
 )
 
+import tabulardelta
 from tabulardelta import (
     DetailedTextFormatter,
     OverviewRowFormatter,
+    PandasComparator,
 )
 from tabulardelta.comparators.tabulardelta_dataclasses import (
     Column,
@@ -199,3 +201,128 @@ def test_row_formatter_smoke(sample_size: int = 10):
             raise e
         if idx % 10 == 0:
             print(f"Completed {idx}/{sample_size}")
+
+
+def test_str_diff():
+    old = """Removed line
+Single equal line
+Multiple equal lines
+    equal as well
+Replaced line A""".splitlines()
+
+    new = """Single equal line
+Added line
+Multiple equal lines
+    equal as well
+Replace line B""".splitlines()
+
+    old_diff, new_diff = tabulardelta.formatters.detailed_text_formatter._str_diff(
+        old, new
+    )
+
+    assert (
+        "\n".join(old_diff)
+        == """[diff]
+-Removed line
+ Single equal line
+
+[...]
+-Replaced line A"""
+    )
+
+    assert (
+        "\n".join(new_diff)
+        == """[diff]
+
+ Single equal line
++Added line
+[...]
++Replace line B"""
+    )
+
+
+def example_json(age: int, timestasmp: str) -> str:
+    return """{
+  "users": {
+    "id": 1,
+    "name": "Alice Johnson",
+    "email": "alice.johnson@example.com",
+    "age": <AGE>,
+    "isActive": true,
+    "roles": ["admin", "editor"],
+    "profile": {
+      "bio": "Data scientist with 5 years of experience in machine learning.",
+      "location": "New York",
+      "social": {
+        "linkedin": "linkedin.com/in/alicejohnson",
+        "github": "github.com/alicej"
+      }
+    }
+  },
+  "meta": {
+    "count": 3,
+    "timestamp": "<TIMESTAMP>"
+  }
+}""".replace("<AGE>", str(age)).replace("<TIMESTAMP>", timestasmp)
+
+
+def test_some_value_change_diff():
+    first = pd.DataFrame({"col": [example_json(29, "2025-07-27T10:00:00Z")]})
+    second = pd.DataFrame({"col": [example_json(30, "2025-07-28T02:05:00Z")]})
+    delta = PandasComparator().compare(first, second)
+    assert (
+        DetailedTextFormatter().format(delta)
+        == """------------------------------------------ TabularDelta Report:  -------------------------------------------
+
+Joined on index.
+
+All columns and types are identical.
+
+   Old         New
+    1           1
+┏━┯━┯━┯━┓╌╌╌┏━┯━┯━┯━┓------------╶╮ 1
+┃ │ │ │ ┃ ≠ ┃ │ │ │ ┃  1 changed  ├╴rows
+┗━┷━┷━┷━┛╌╌╌┗━┷━┷━┷━┛------------╶╯ joined
+
+Column col - 1 rows changed:
+        col                                       →  col                                       example_index
+        [diff]                                    →  [diff]                                    0
+        [...]                                        [...]
+        -    "age": 29,                              +    "age": 30,
+        [...]                                        [...]
+        -    "timestamp": "2025-07-27T10:00:00Z"     +    "timestamp": "2025-07-28T02:05:00Z"
+        [...]                                        [...]"""
+    )
+
+
+def test_all_value_change_diff():
+    json = example_json(29, "2025-07-27T10:00:00Z")
+    first = pd.DataFrame({"col": [json]})
+    second = pd.DataFrame(
+        {"col": ["\n".join(line.strip() for line in json.splitlines())]}
+    )
+    delta = PandasComparator().compare(first, second)
+    assert (
+        DetailedTextFormatter().format(delta)
+        == """------------------------------------------ TabularDelta Report:  -------------------------------------------
+
+Joined on index.
+
+All columns and types are identical.
+
+   Old         New
+    1           1
+┏━┯━┯━┯━┓╌╌╌┏━┯━┯━┯━┓------------╶╮ 1
+┃ │ │ │ ┃ ≠ ┃ │ │ │ ┃  1 changed  ├╴rows
+┗━┷━┷━┷━┛╌╌╌┗━┷━┷━┷━┛------------╶╯ joined
+
+Column col - 1 rows changed:
+        col                                         →  col                                     example_index
+        [diff]                                      →  [diff]                                  0
+         {                                              {
+        -  "users": {                                  +"users": {
+        -    "id": 1,                                  +"id": 1,
+        -    "name": "Alice Johnson",                  +"name": "Alice Johnson",
+        -    "email": "alice.johnson@example.com",     +"email": "alice.johnson@example.com",
+        [...omitted]                                   [...omitted]"""
+    )

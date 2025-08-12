@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import difflib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from itertools import zip_longest
 from typing import Any
 
 import numpy as np
@@ -56,9 +58,14 @@ class DetailedTextFormatter:
     0 to disable.
     """
     row_examples = 3
-    """How many examples per row category to show in the report.
+    """How many examples to show for added and removed rows in the report.
 
     0 to disable.
+    """
+    value_change_height = 5
+    """Maximum lines to show per value change in the report.
+
+    Uses line-by-line diff if cells are too large.
     """
 
     def format(self, delta: TabularDelta) -> str:
@@ -105,7 +112,13 @@ class DetailedTextFormatter:
 
         if self.value_changes > 0:
             for chg in delta.cols.differences:
-                result.append([_show_values(chg, self.value_changes + 3, True)])
+                result.append(
+                    [
+                        _show_values(
+                            chg, self.value_changes + 3, self.value_change_height, True
+                        )
+                    ]
+                )
 
         result.append(_example_rows("ADDED", delta.rows.added, self.row_examples))
         result.append(_example_rows("REMOVED", delta.rows.removed, self.row_examples))
@@ -151,6 +164,39 @@ def _standardize_col_data(col: ColType) -> list[str]:
     return [col.old.name + name_change, f"({col.old.type + type_change})"]
 
 
+def _str_diff(left: list[str], right: list[str], max_lines=10):
+    """Create abbreviated line-by-line diffs
+                                                        [diff]              [diff]
+    Removed line            Single equal line           -Removed line
+    Single equal line       Added line                  Single equal line   Single equal line
+    Multiple equal lines    Multiple equal lines    =>                      +Added line
+        equal as well           equal as well           [...]               [...]
+    Replaced line A         Replaced line B             -Replaced line A    +Replaced line B
+    """
+    out = [("[diff]", "[diff]")]
+
+    sm = difflib.SequenceMatcher(a=left, b=right)
+    for tag, l1, l2, r1, r2 in sm.get_opcodes():
+        ls = left[l1:l2]
+        rs = right[r1:r2]
+        if tag == "equal" and len(ls) == 1:
+            # Keep equal individual lines
+            out.append((f" {ls[0]}", f" {rs[0]}"))
+        elif tag == "equal":
+            # Abbreviate equal multi-line parts
+            out.append(("[...]", "[...]"))
+        else:
+            # Append -removed_line to the left or +added_line to the right
+            for lzip, rzip in zip_longest(ls, rs, fillvalue=None):
+                lzip = "" if lzip is None else f"-{lzip}"
+                rzip = "" if rzip is None else f"+{rzip}"
+                out.append((lzip, rzip))
+    if len(out) > max_lines:
+        # Abbreviate result if longer than `max_lines`
+        out = out[: max_lines - 1] + [("[...omitted]", "[...omitted]")]
+    return zip(*out)
+
+
 def _show_cols(name: str, cols: list[ColType], max_width: int = 80) -> Cell:
     """Shows columns nicely visualized, or listed in columns if too wide.
 
@@ -178,7 +224,9 @@ def _show_cols(name: str, cols: list[ColType], max_width: int = 80) -> Cell:
     return Cell([f"{name}:"] + table.lines())
 
 
-def _show_values(chg: ChangedColumn, max_height=10, header: bool = False) -> Cell:
+def _show_values(
+    chg: ChangedColumn, max_rows=10, max_row_height=10, header: bool = False
+) -> Cell:
     """
     Show value changes of columns:
          id_old ─►  id_new example_name
@@ -190,22 +238,22 @@ def _show_values(chg: ChangedColumn, max_height=10, header: bool = False) -> Cel
     old, new, total = chg.old.name, chg.new.name, len(chg)
     result: list[list[Cell] | list[str]] = []
     indices = []
-    for row, idx in zip(chg, range(1 + header, max_height)):
+    for row, idx in zip(chg, range(1 + header, max_rows)):
         if not result:
             indices = sorted(list(row.example_join_columns))
             if header:
                 content = [f"Column {new} - {total} rows changed:"]
                 result.append([Cell(content, colspan=5 + len(indices))])
+
             result.append(["", "", old, "→", new] + [f"example_{i}" for i in indices])
-        if idx == max_height - 1 and total > row.count:
+        if idx == max_rows - 1 and total > row.count:
             break  # max_height will not suffice to print all changes
-        content = [
-            "    ",
-            f"({row.count}x)" * int(row.count > 1),
-            row.old,
-            "→",
-            row.new,
-        ]
+        oldlines = str(row.old).splitlines()
+        newlines = str(row.new).splitlines()
+        if len(oldlines) > max_row_height or len(newlines) > max_row_height:
+            oldlines, newlines = _str_diff(oldlines, newlines, max_row_height + 2)
+        count = f"({row.count}x)" * int(row.count > 1)
+        content = ["    ", count, "\n".join(oldlines), "→", "\n".join(newlines)]
         result.append(content + [row.example_join_columns[ex] for ex in indices])
         total -= row.count
     if total > 0:
