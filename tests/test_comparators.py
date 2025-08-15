@@ -242,6 +242,39 @@ def test_pandas_comparator_row_col_orders():
 
 
 @pytest.mark.sql
+def test_sql_many_changes(mssql_engine: sa.Engine):
+    df1 = pd.DataFrame(
+        {"index": range(500), "constant": range(500), "change": range(500)}
+    )
+    df2 = pd.DataFrame(
+        {"index": range(500), "constant": range(500), "change": range(10, 510)}
+    )
+    df1.to_sql("first", mssql_engine, index=False, index_label="name", schema="dbo")
+    df2.to_sql("second", mssql_engine, index=False, index_label="name", schema="dbo")
+    delta = SqlCompyreComparator(mssql_engine, ["index"]).compare("first", "second")
+    print(delta.cols.differences)
+    assert len(delta.cols.differences) == 1
+    assert len(delta.cols.differences[0]) == 500
+    for change in delta.cols.differences[0]:
+        assert change.new == 10 + change.old
+
+
+def test_pandas_many_changes(mssql_engine: sa.Engine):
+    df1 = pd.DataFrame(
+        {"index": range(500), "constant": range(500), "change": range(500)}
+    )
+    df2 = pd.DataFrame(
+        {"index": range(500), "constant": range(500), "change": range(10, 510)}
+    )
+    delta = PandasComparator(["index"]).compare(df1, df2)
+    print(delta.cols.differences)
+    assert len(delta.cols.differences) == 1
+    assert len(delta.cols.differences[0]) == 500
+    for change in delta.cols.differences[0]:
+        assert change.new == 10 + change.old
+
+
+@pytest.mark.sql
 @pytest.mark.parametrize(
     "input_type", ["table_str", "schema_table_str", "bracket_table_str", "sa_table"]
 )
