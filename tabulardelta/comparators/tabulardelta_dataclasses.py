@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -61,6 +62,14 @@ class ChangedValue:
     count: int
     """(Positive) number of rows containing this change."""
 
+    def _is_placeholder(self):
+        return (
+            isinstance(self.old, float)
+            and isinstance(self.new, float)
+            and math.isnan(self.old)
+            and math.isnan(self.new)
+        )
+
 
 @dataclass
 class ColumnPair:
@@ -114,11 +123,13 @@ class ColumnPair:
         """Examples of value changes."""
         for idx, row in self._values.iterrows() if self._values is not None else []:
             index = {k: v for k, v in row.to_dict().items() if k not in self._required}
-            yield ChangedValue(index, *[row[key] for key in self._required])
+            changedValue = ChangedValue(index, *[row[key] for key in self._required])
+            if not changedValue._is_placeholder():
+                yield changedValue
 
     def __len__(self) -> int:
         """Total number of changes."""
-        return self._values["_count"].sum() if self._values is not None else 0
+        return int(self._values["_count"].sum()) if self._values is not None else 0
 
     @staticmethod
     def from_sqlalchemy(
@@ -228,12 +239,18 @@ class ColumnPair:
                 self._values[col] = self._values[col].astype("object")
 
         # Compactify dataframe by grouping equal changes together
+        total_changes = self._values["_count"].sum()
         groupby = self._values.groupby(group_by_cols, as_index=False, dropna=False)
         join_cols = {c: (c, "first") for c in set(self._values) - set(self._required)}
         agg = groupby.agg(_count=("_count", "sum"), **join_cols)  # type: ignore
         sort = agg.sort_values(by="_count", ascending=False)
         actual_changes = ~sort[self._df_old_name].isna() | ~sort[self.new.name].isna()
-        self._values = sort[actual_changes]
+        result = sort[actual_changes]
+        if total_changes > result["_count"].sum():
+            result.loc[result.shape[0], "_count"] = (
+                total_changes - result["_count"].sum()
+            )
+        self._values = result
 
 
 @dataclass(frozen=True)

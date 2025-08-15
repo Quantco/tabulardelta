@@ -202,7 +202,8 @@ def _get_value_change(
     total = min(tab_comp.row_counts.left, tab_comp.row_counts.right)
     try:
         with tab_comp.engine.connect() as conn:
-            total = conn.execute(sa.select(count).select_from(diffs)).scalar() or total
+            tab_total = conn.execute(sa.select(count).select_from(diffs)).scalar()
+            total = tab_total if tab_total is not None else total
         result = pd.read_sql(query, tab_comp.engine).astype("object")
         result.loc[result.shape[0], "_count"] = total - result["_count"].sum()
     except (sa.exc.ProgrammingError, sa.exc.DataError):
