@@ -42,27 +42,27 @@ class DetailedTextFormatter:
         Formats comparison result
     """
 
-    errors = True
+    errors: bool = True
     """Whether to show errors in the report."""
-    warnings = True
+    warnings: bool = True
     """Whether to show warnings in the report."""
-    infos = True
+    infos: bool = True
     """Whether to show additional information in the report."""
-    column_changes = True
+    column_changes: bool = True
     """Whether to show column and type changes in the report."""
-    row_overview = True
+    row_overview: bool = True
     """Whether to show graphical row matching in the report."""
-    value_changes = 5
+    value_changes: int = 5
     """How many value changes per column to show in the report.
 
     0 to disable.
     """
-    row_examples = 3
+    row_examples: int = 3
     """How many examples to show for added and removed rows in the report.
 
     0 to disable.
     """
-    value_change_height = 5
+    value_change_height: int = 5
     """Maximum lines to show per value change in the report.
 
     Uses line-by-line diff if cells are too large.
