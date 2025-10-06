@@ -327,7 +327,7 @@ Since it doesn't touch the actual data, it is very fast, but the rows can't be c
 
 A column is missing unexpectedly at the end of the pipeline.
 Usually, it would be cumbersome to find the source of this problem,
-but using the report, we can immediately see that the bug was introduced in code_featuers.
+but using the report, we can immediately see that the bug was introduced in code_features.
 
 Looking at the total row count, usually 3% of our rows are filtered out at the end.
 But this time, over 57% of the new rows are missing, so it might be worth investigating further.
