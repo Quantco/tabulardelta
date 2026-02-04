@@ -32,11 +32,11 @@ Installation
 
 .. code:: bash
 
-    pip install sqlcompyre
+    pip install tabulardelta
     # or
-    micromamba install sqlcompyre
+    micromamba install tabulardelta
     # or
-    conda install sqlcompyre
+    conda install tabulardelta
 
 Examples
 ========
