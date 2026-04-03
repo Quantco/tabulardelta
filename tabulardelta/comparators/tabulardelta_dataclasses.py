@@ -122,7 +122,9 @@ class ColumnPair:
     def __iter__(self) -> Iterator[ChangedValue]:
         """Examples of value changes."""
         for idx, row in self._values.iterrows() if self._values is not None else []:
-            index = {k: v for k, v in row.to_dict().items() if k not in self._required}
+            index = {
+                str(k): v for k, v in row.to_dict().items() if k not in self._required
+            }
             changedValue = ChangedValue(index, *[row[key] for key in self._required])
             if not changedValue._is_placeholder():
                 yield changedValue
