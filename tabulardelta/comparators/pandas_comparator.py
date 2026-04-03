@@ -70,8 +70,8 @@ class PandasComparator:
         return compare_pandas(
             old,
             new,
-            old.dtypes.astype("string").to_dict(),
-            new.dtypes.astype("string").to_dict(),
+            {str(k): v for k, v in old.dtypes.astype("string").to_dict().items()},
+            {str(k): v for k, v in new.dtypes.astype("string").to_dict().items()},
             self.join_columns,
             self.name,
             self.float_rtol,

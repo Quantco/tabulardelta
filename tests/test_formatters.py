@@ -12,7 +12,6 @@ from numpy import (
     ndarray,
 )
 
-import tabulardelta
 from tabulardelta import (
     DetailedTextFormatter,
     OverviewRowFormatter,
@@ -23,6 +22,7 @@ from tabulardelta.comparators.tabulardelta_dataclasses import (
     ColumnPair,
     TabularDelta,
 )
+from tabulardelta.formatters.detailed_text_formatter import _str_diff
 
 
 def get_random_tabulardelta(gen: np.random.Generator):
@@ -77,7 +77,7 @@ def get_random_tabulardelta(gen: np.random.Generator):
             }
         )
         if gen.random() < 0.5:
-            additional = gen.integers(0, 10 ** gen.integers(0, 8))
+            additional = int(gen.integers(0, 10 ** gen.integers(0, 8)))
             df.loc[len(df)] = [None] * (2 + len(join_columns)) + [additional]
             df["_count"] = df["_count"].astype("int")
         return ColumnPair(chg.old, chg.new, incomparable=incomparable, _values=df)
@@ -216,9 +216,7 @@ Multiple equal lines
     equal as well
 Replace line B""".splitlines()
 
-    old_diff, new_diff = tabulardelta.formatters.detailed_text_formatter._str_diff(
-        old, new
-    )
+    old_diff, new_diff = _str_diff(old, new)
 
     assert (
         "\n".join(old_diff)

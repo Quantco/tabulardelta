@@ -93,7 +93,7 @@ class Align:
 
 
 Align.TopLeft = lambda char=" ": Align(
-    lambda lines, size: (lines + [""] * (size - len(lines))),
+    lambda lines, size: lines + [""] * (size - len(lines)),
     lambda line, size: line.ljust(size, char),
 )
 
